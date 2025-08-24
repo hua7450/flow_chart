@@ -4,14 +4,26 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
-// Suppress ResizeObserver loop errors
+// Suppress ResizeObserver loop errors more aggressively
 const resizeObserverErr = window.console.error;
 window.console.error = (...args: any[]) => {
-  if (args[0]?.includes?.('ResizeObserver loop completed with undelivered notifications')) {
+  if (args && args[0] && typeof args[0] === 'string' && 
+      (args[0].includes('ResizeObserver loop') || 
+       args[0].includes('ResizeObserver loop completed') ||
+       args[0].includes('ResizeObserver loop limit'))) {
     return;
   }
   resizeObserverErr(...args);
 };
+
+// Also catch unhandled errors
+window.addEventListener('unhandledrejection', function(e) {
+  if (e.reason && e.reason.message && 
+      (e.reason.message.includes('ResizeObserver loop') ||
+       e.reason.message.includes('ResizeObserver loop completed'))) {
+    e.preventDefault();
+  }
+});
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement

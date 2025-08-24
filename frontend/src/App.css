@@ -5,10 +5,9 @@
 
 /* Vis.js network container needs explicit height */
 .vis-network {
-  width: 100%;
-  height: 100%;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
+  width: 100% !important;
+  height: 100% !important;
+  position: relative;
 }
 
 /* Custom scrollbar for sidebar */

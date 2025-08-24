@@ -137,7 +137,35 @@ def generate_graph():
         nodes = []
         for node_id, node_data in graph_data['nodes'].items():
             node_type = node_data.get('type', 'variable')
-            color = '#90EE90' if node_data['level'] == 0 else '#ff9999' if node_type == 'stop' else '#87CEEB'
+            
+            # Better color scheme with border and background
+            if node_data['level'] == 0:
+                color = {
+                    'background': '#90EE90',
+                    'border': '#4CAF50',
+                    'highlight': {
+                        'background': '#7DD87D',
+                        'border': '#4CAF50'
+                    }
+                }
+            elif node_type == 'stop':
+                color = {
+                    'background': '#ffb3b3',
+                    'border': '#ff6666',
+                    'highlight': {
+                        'background': '#ff9999',
+                        'border': '#ff6666'
+                    }
+                }
+            else:
+                color = {
+                    'background': '#b3d9ff',
+                    'border': '#66b3ff',
+                    'highlight': {
+                        'background': '#99ccff',
+                        'border': '#66b3ff'
+                    }
+                }
             
             nodes.append({
                 'id': node_id,
@@ -146,18 +174,42 @@ def generate_graph():
                 'level': node_data['level'],
                 'color': color,
                 'shape': 'box',
-                'font': {'size': 12}
+                'font': {
+                    'size': 14,
+                    'color': '#333333',
+                    'face': 'Arial, sans-serif',
+                    'bold': node_data['level'] == 0
+                },
+                'borderWidth': 2,
+                'borderWidthSelected': 3
             })
         
         # Format edges
         edges = []
         for edge in graph_data['edges']:
-            edge_color = '#00ff00' if edge['type'] == 'adds' else '#ff0000' if edge['type'] == 'subtracts' else '#999999'
+            if edge['type'] == 'adds':
+                edge_color = {'color': '#00cc00', 'highlight': '#00ff00'}
+            elif edge['type'] == 'subtracts':
+                edge_color = {'color': '#cc0000', 'highlight': '#ff0000'}
+            else:
+                edge_color = {'color': '#666666', 'highlight': '#999999'}
+                
             edges.append({
                 'from': edge['from'],
                 'to': edge['to'],
                 'color': edge_color,
-                'arrows': 'to'
+                'arrows': {
+                    'to': {
+                        'enabled': True,
+                        'scaleFactor': 1.2
+                    }
+                },
+                'width': 2,
+                'smooth': {
+                    'enabled': True,
+                    'type': 'cubicBezier',
+                    'roundness': 0.5
+                }
             })
         
         return jsonify({
