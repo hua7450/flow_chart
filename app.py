@@ -9,7 +9,10 @@ import ast
 from pathlib import Path
 from pyvis.network import Network
 import tempfile
-from typing import Dict, List, Set, Optional
+from typing import Dict, List, Set, Optional, Tuple, Any
+import yaml
+from datetime import datetime
+import re
 
 # Import stop variables configuration
 from stop_variables_config import DEFAULT_STOP_VARIABLES
@@ -21,8 +24,8 @@ st.set_page_config(
     layout="wide"
 )
 
-# Cache the variables data
-@st.cache_data
+# Cache the variables data (clear cache if code changes)
+@st.cache_data(ttl=300)  # Cache for 5 minutes only
 def load_variables():
     """Load variables directly from the PolicyEngine submodule."""
     variables_dir = Path(__file__).parent / "policyengine-us" / "policyengine_us" / "variables"
@@ -107,7 +110,7 @@ def extract_variable_metadata(class_node: ast.ClassDef, file_path: Path) -> Dict
         "formula": None,
         "adds": [],
         "subtracts": [],
-        "parameters": [],
+        "parameters": {},  # Changed to dict to store parameter paths
         "variables": [],
         "defined_for": [],
         "description": None,
@@ -127,10 +130,22 @@ def extract_variable_metadata(class_node: ast.ClassDef, file_path: Path) -> Dict
                         metadata["label"] = value
                     elif attr_name == "documentation" and isinstance(value, str):
                         metadata["description"] = value
-                    elif attr_name == "adds" and isinstance(value, list):
-                        metadata["adds"] = value
-                    elif attr_name == "subtracts" and isinstance(value, list):
-                        metadata["subtracts"] = value
+                    elif attr_name == "adds":
+                        if isinstance(value, list):
+                            metadata["adds"] = value
+                        elif isinstance(value, str) and value.startswith("gov."):
+                            # This is a parameter path
+                            metadata["parameters"]["adds_sources"] = value
+                        else:
+                            metadata["adds"] = [value] if value else []
+                    elif attr_name == "subtracts":
+                        if isinstance(value, list):
+                            metadata["subtracts"] = value
+                        elif isinstance(value, str) and value.startswith("gov."):
+                            # This is a parameter path
+                            metadata["parameters"]["subtracts_sources"] = value
+                        else:
+                            metadata["subtracts"] = [value] if value else []
                     elif attr_name == "defined_for":
                         if isinstance(value, str):
                             metadata["defined_for"] = [value]
@@ -138,10 +153,12 @@ def extract_variable_metadata(class_node: ast.ClassDef, file_path: Path) -> Dict
                             metadata["defined_for"] = value
         
         elif isinstance(node, ast.FunctionDef) and node.name == "formula":
-            # Extract variables used in the formula
+            # Extract variables and parameters used in the formula
             formula_vars = extract_formula_variables(node)
             metadata["variables"] = formula_vars
-            # Don't set formula as a string - let the variables list handle dependencies
+            # Extract parameter usage
+            param_info = extract_formula_parameters(node)
+            metadata["parameters"] = param_info
     
     return metadata
 
@@ -178,6 +195,341 @@ def extract_formula_variables(func_node: ast.FunctionDef) -> List[str]:
     
     return list(variables)
 
+def extract_formula_parameters(func_node: ast.FunctionDef) -> Dict[str, str]:
+    """Extract parameter paths used in a formula function."""
+    parameters = {}
+    param_vars = {}  # Track variable assignments like p = parameters(period).gov...
+    
+    # First pass: find parameter assignments
+    for node in ast.walk(func_node):
+        if isinstance(node, ast.Assign):
+            # Check for p = parameters(period).gov...
+            if (len(node.targets) == 1 and 
+                isinstance(node.targets[0], ast.Name)):
+                var_name = node.targets[0].id
+                
+                # Check if this is a parameters() call
+                if isinstance(node.value, ast.Attribute):
+                    # Traverse the chain to build the full path
+                    path_parts = []
+                    current = node.value
+                    
+                    while isinstance(current, ast.Attribute):
+                        path_parts.insert(0, current.attr)
+                        current = current.value
+                    
+                    if (isinstance(current, ast.Call) and 
+                        isinstance(current.func, ast.Name) and 
+                        current.func.id == "parameters"):
+                        # This is a parameters(period) call
+                        param_vars[var_name] = ".".join(path_parts)
+    
+    # Second pass: find parameter usage
+    for node in ast.walk(func_node):
+        if isinstance(node, ast.Attribute):
+            # Check for p.electricity, p.water, etc.
+            if (isinstance(node.value, ast.Name) and 
+                node.value.id in param_vars):
+                # This is using a parameter variable
+                base_path = param_vars[node.value.id]
+                full_path = f"{base_path}.{node.attr}"
+                # Use the attribute name as key for easy reference
+                parameters[node.attr] = full_path
+    
+    return parameters
+
+# Cache parameter files
+@st.cache_data
+def load_parameter_file(param_path: str) -> Optional[Dict]:
+    """Load a parameter YAML file from the PolicyEngine parameters directory."""
+    try:
+        # Convert dot path to file path
+        # gov.local.ca.riv.cap.share.payment.electricity -> 
+        # parameters/gov/local/ca/riv/cap/share/payment/electricity.yaml
+        path_parts = param_path.split(".")
+        yaml_path = Path(__file__).parent / "policyengine-us" / "policyengine_us" / "parameters"
+        for part in path_parts:
+            yaml_path = yaml_path / part
+        yaml_path = yaml_path.with_suffix(".yaml")
+        
+        if not yaml_path.exists():
+            return None
+        
+        with open(yaml_path, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f)
+    except Exception as e:
+        st.warning(f"Could not load parameter {param_path}: {str(e)}")
+        return None
+
+def detect_parameter_structure(param_data: Dict) -> str:
+    """Detect the structure type of a parameter file."""
+    if not param_data:
+        return "unknown"
+    
+    # Check for standard keys
+    if "values" in param_data:
+        values = param_data["values"]
+        # Get the first date key's value
+        first_value = next(iter(values.values())) if values else None
+        if isinstance(first_value, list):
+            return "list"
+        else:
+            return "simple"
+    elif "brackets" in param_data:
+        return "brackets"
+    
+    # Check the non-metadata keys
+    data_keys = [k for k in param_data.keys() if k not in ["metadata", "description"]]
+    if not data_keys:
+        return "empty"
+    
+    sample_key = data_keys[0]
+    
+    # Check if numeric indexed
+    if str(sample_key).isdigit():
+        return "numeric_index"
+    
+    # Check if category based (uppercase keys)
+    if sample_key.isupper():
+        # Check nesting depth
+        sample_value = param_data[sample_key]
+        if isinstance(sample_value, dict):
+            sub_keys = [k for k in sample_value.keys() if k != "metadata"]
+            if sub_keys:
+                sub_key = sub_keys[0]
+                if str(sub_key).isdigit():
+                    # Like LIHEAP - housing type -> income level -> household size
+                    return "nested_3_level"
+                elif sub_key.isupper():
+                    # Like reimbursement rates
+                    return "nested_3_level_category"
+        return "category"
+    
+    return "unknown"
+
+def get_latest_value(value_data: Any, period: Optional[str] = None) -> Any:
+    """Get the latest value from a time-series parameter value."""
+    if not isinstance(value_data, dict):
+        return value_data
+    
+    # If it's a dict with date keys (could be strings or datetime objects)
+    date_keys = []
+    for key in value_data.keys():
+        # Check if it's a datetime.date object
+        if hasattr(key, 'year') and hasattr(key, 'month') and hasattr(key, 'day'):
+            date_keys.append(key)
+        # Check if this looks like a date string (YYYY-MM-DD format)
+        elif isinstance(key, str) and len(key) == 10 and key[4] == "-" and key[7] == "-":
+            try:
+                # Verify it's a valid date format
+                year, month, day = key.split("-")
+                if year.isdigit() and month.isdigit() and day.isdigit():
+                    date_keys.append(key)
+            except:
+                pass
+    
+    if date_keys:
+        # Sort dates and get the latest
+        date_keys.sort()
+        if period:
+            # Find the value for the specified period or closest before
+            # Convert period string to comparable format if needed
+            for date in reversed(date_keys):
+                # Compare appropriately based on type
+                if (isinstance(date, str) and date <= period) or \
+                   (hasattr(date, 'strftime') and date.strftime("%Y-%m-%d") <= period):
+                    return value_data[date]
+        # Return the latest value
+        return value_data[date_keys[-1]]
+    
+    return value_data
+
+def format_parameter_value(param_data: Dict, param_name: str, detail_level: str = "Summary") -> str:
+    """Format a parameter value for display based on its structure."""
+    if not param_data:
+        return "Parameter not found"
+    
+    structure = detect_parameter_structure(param_data)
+    metadata = param_data.get("metadata", {})
+    unit = metadata.get("unit", "")
+    label = metadata.get("label", param_name)
+    
+    if structure == "simple":
+        value = get_latest_value(param_data["values"])
+        if isinstance(value, dict):
+            # Still has nested structure, get the actual value
+            value = next(iter(value.values())) if value else 0
+        
+        if unit == "currency-USD":
+            return f"${value:,}"
+        elif unit == "/1":
+            if isinstance(value, (int, float)):
+                return f"{value:.1%}" if value < 1 else f"{value:.0%}"
+            else:
+                return str(value)
+        else:
+            return str(value)
+    
+    elif structure == "list":
+        values = get_latest_value(param_data["values"])
+        if not values:
+            return "Empty list"
+        
+        # Format list items - show ALL items as requested
+        formatted_items = []
+        
+        # Check if this is a list of variable names (for adds/subtracts sources)
+        is_variable_list = all(isinstance(item, str) and "_" in item and not item.isupper() for item in values[:3] if values)
+        
+        if detail_level == "Minimal":
+            # Show count only
+            return f"{len(values)} items"
+        elif detail_level == "Summary":
+            # Show all items but compact
+            for item in values:
+                if isinstance(item, str) and item.isupper():
+                    # Format enum-like values
+                    readable = item.replace("_", " ").title()
+                    formatted_items.append(readable)
+                else:
+                    formatted_items.append(str(item))
+            
+            # For variable lists, show each on new line for clarity
+            if is_variable_list and len(values) <= 5:
+                return "\n    - " + "\n    - ".join(formatted_items)
+            elif len(values) > 10:
+                return f"({len(values)} items): {', '.join(formatted_items)}"
+            else:
+                return ", ".join(formatted_items)
+        else:  # Full
+            # Show all items with line breaks
+            for item in values:
+                if isinstance(item, str) and item.isupper():
+                    readable = item.replace("_", " ").title()
+                    formatted_items.append(f"\n  • {readable}")
+                else:
+                    formatted_items.append(f"\n  • {str(item)}")
+            
+            return f"({len(values)} items):" + "".join(formatted_items)
+    
+    elif structure == "numeric_index":
+        # Show values based on detail level
+        items = []
+        
+        if detail_level == "Minimal":
+            # Just show range
+            numeric_keys = [k for k in param_data.keys() if str(k).isdigit() and k not in ["metadata", "description"]]
+            if numeric_keys:
+                first_val = get_latest_value(param_data.get("1", param_data.get(1, {})))
+                # Handle nested dict result
+                if isinstance(first_val, dict):
+                    first_val = next(iter(first_val.values())) if first_val else 0
+                    
+                last_key = str(max(int(k) for k in numeric_keys))
+                last_val = get_latest_value(param_data.get(last_key, {}))
+                # Handle nested dict result
+                if isinstance(last_val, dict):
+                    last_val = next(iter(last_val.values())) if last_val else 0
+                    
+                if unit == "currency-USD":
+                    return f"1: ${first_val:,} ... {last_key}: ${last_val:,}"
+                else:
+                    return f"1: {first_val} ... {last_key}: {last_val}"
+            return "No values"
+        elif detail_level == "Summary":
+            # Show first few
+            for i in range(1, min(4, len(param_data) + 1)):
+                if str(i) in param_data:
+                    value = get_latest_value(param_data[str(i)])
+                    # Handle nested dict result
+                    if isinstance(value, dict):
+                        value = next(iter(value.values())) if value else 0
+                    if unit == "currency-USD":
+                        items.append(f"{i}: ${value:,}")
+                    else:
+                        items.append(f"{i}: {value}")
+            
+            if len(param_data) > 3:
+                items.append("...")
+            
+            return " | ".join(items)
+        else:  # Full
+            # Show all values
+            for key in sorted(param_data.keys(), key=lambda x: int(x) if str(x).isdigit() else 999):
+                if str(key).isdigit():
+                    value = get_latest_value(param_data[key])
+                    # Handle nested dict result
+                    if isinstance(value, dict):
+                        value = next(iter(value.values())) if value else 0
+                    if unit == "currency-USD":
+                        items.append(f"{key}: ${value:,}")
+                    else:
+                        items.append(f"{key}: {value}")
+            
+            return " | ".join(items)
+    
+    elif structure == "category":
+        # Show all categories
+        items = []
+        for cat in ["SINGLE", "JOINT", "SEPARATE", "HEAD_OF_HOUSEHOLD", "SURVIVING_SPOUSE"]:
+            if cat in param_data:
+                value = get_latest_value(param_data[cat])
+                # Handle nested dict result
+                if isinstance(value, dict):
+                    value = next(iter(value.values())) if value else 0
+                cat_name = cat.replace("_", " ").title()
+                if unit == "currency-USD":
+                    items.append(f"{cat_name}: ${value:,}")
+                else:
+                    items.append(f"{cat_name}: {value}")
+        
+        return " | ".join(items) if items else "No categories found"
+    
+    elif structure == "brackets":
+        # Show simplified bracket structure
+        brackets = param_data.get("brackets", [])
+        if not brackets:
+            return "No brackets"
+        
+        items = []
+        for i, bracket in enumerate(brackets[:3]):  # Show first 3 brackets
+            threshold = get_latest_value(bracket.get("threshold", {}))
+            amount = get_latest_value(bracket.get("amount", {}))
+            
+            if metadata.get("threshold_unit") == "child":
+                items.append(f"{threshold} child: {amount:.1%}")
+            else:
+                items.append(f">{threshold}: {amount}")
+        
+        if len(brackets) > 3:
+            items.append("...")
+        
+        return " | ".join(items)
+    
+    elif structure == "nested_3_level":
+        # Show summary for complex nested structures
+        all_values = []
+        for level1 in param_data.values():
+            if isinstance(level1, dict) and level1 != metadata:
+                for level2 in level1.values():
+                    if isinstance(level2, dict):
+                        for level3 in level2.values():
+                            if isinstance(level3, dict):
+                                value = get_latest_value(level3)
+                                if value is not None:
+                                    all_values.append(value)
+        
+        if all_values:
+            if unit == "currency-USD":
+                return f"Range: ${min(all_values):,} - ${max(all_values):,}"
+            else:
+                return f"Range: {min(all_values)} - {max(all_values)}"
+        
+        return "Complex nested structure"
+    
+    else:
+        return f"Unknown structure: {structure}"
+
 def extract_dependencies_from_variable(variable_data: Dict) -> Dict[str, List[str]]:
     """
     Extract all types of dependencies from a variable's data.
@@ -205,9 +557,8 @@ def extract_dependencies_from_variable(variable_data: Dict) -> Dict[str, List[st
     if variable_data.get("subtracts"):
         deps["subtracts"] = variable_data["subtracts"]
     
-    # Get parameter dependencies
-    if variable_data.get("parameters"):
-        deps["parameters"] = variable_data["parameters"]
+    # Don't include parameters as dependencies - they're just values to display
+    # Parameters should not appear as nodes in the graph
     
     # Get variable references in formulas
     if variable_data.get("variables"):
@@ -225,7 +576,10 @@ def build_dependency_graph(
     max_depth: int = 10,
     stop_variables: Set[str] = None,
     expand_adds_subtracts: bool = True,
-    show_parameters: bool = True
+    show_parameters: bool = True,
+    param_detail_level: str = "Summary",
+    param_date: Optional[str] = None,
+    no_params_list: List[str] = None
 ) -> Dict:
     """
     Build a dependency graph for a given variable.
@@ -298,12 +652,35 @@ def build_dependency_graph(
         # Get variable data
         var_data = variables.get(var_name, {})
         
-        # Simple tooltip - only show label on hover/click
-        if var_data.get("label"):
-            node_data["title"] = var_data["label"]
-        else:
-            node_data["title"] = var_name  # Fallback if no label exists
+        # Create enhanced tooltip with parameter information (using plain text for PyVis compatibility)
+        tooltip_parts = []
         
+        # Add variable label
+        if var_data.get("label"):
+            tooltip_parts.append(var_data['label'])
+        else:
+            tooltip_parts.append(var_name)
+        
+        # Add parameter information if available and enabled (and not in no_params_list)
+        if show_parameters and var_data.get("parameters") and var_name not in (no_params_list or []):
+            param_info = var_data["parameters"]
+            if param_info:
+                tooltip_parts.append("\n\nPARAMETERS:")
+                for param_name, param_path in param_info.items():
+                    # Load parameter data
+                    param_data = load_parameter_file(param_path)
+                    if param_data:
+                        # Get formatted value with detail level
+                        param_value = format_parameter_value(param_data, param_name, param_detail_level)
+                        # Remove any HTML from the formatted value
+                        param_value = param_value.replace("<br>", "\n")
+                        param_label = param_data.get("metadata", {}).get("label", param_name)
+                        tooltip_parts.append(f"\n• {param_label}: {param_value}")
+                    else:
+                        tooltip_parts.append(f"\n• {param_name}: Not found")
+        
+        
+        node_data["title"] = "".join(tooltip_parts)
         nodes[var_name] = node_data
         
         # Add edge from dependency to parent (reversed direction)
@@ -336,12 +713,8 @@ def build_dependency_graph(
             if dep and dep != var_name:
                 traverse(dep, depth + 1, var_name, "formula")
         
-        # Process parameters if enabled
-        if show_parameters:
-            for dep in all_deps["parameters"]:
-                dep = clean_variable_name(dep)
-                if dep and dep != var_name:
-                    traverse(dep, depth + 1, var_name, "parameter")
+        # Don't traverse parameters - they're not variables!
+        # Parameters are just values to display, not nodes in the dependency graph
         
         # Process adds/subtracts if enabled
         if expand_adds_subtracts:
@@ -601,6 +974,35 @@ def main():
                 help="Display parameter dependencies"
             )
             
+            # Parameter display options
+            if show_parameters:
+                st.markdown("**Parameter Display Options:**")
+                
+                param_detail_level = st.select_slider(
+                    "Parameter Detail Level",
+                    options=["Minimal", "Summary", "Full"],
+                    value="Summary",
+                    help="Control how much detail to show for parameter values"
+                )
+                
+                use_latest_params = st.checkbox(
+                    "Use Latest Parameter Values",
+                    value=True,
+                    help="Always show the most recent parameter values"
+                )
+                
+                if not use_latest_params:
+                    param_date = st.date_input(
+                        "Parameter Date",
+                        value=datetime.now(),
+                        help="Select date for parameter values"
+                    )
+                else:
+                    param_date = None
+            else:
+                param_detail_level = "Summary"
+                param_date = None
+            
             # Always use hierarchical tree layout
             
             # User-defined stop variables (optional)
@@ -616,6 +1018,18 @@ def main():
             
             # Combine with hidden default stops (DEFAULT_STOP_VARIABLES work silently in background)
             stop_variables = set(DEFAULT_STOP_VARIABLES + custom_stops)
+            
+            # Variables to not show parameters for (optional)
+            if show_parameters:
+                no_params_input = st.text_area(
+                    "Don't Show Parameters For (optional)",
+                    placeholder="ca_riv_share_eligible\nca_riv_share_electricity_emergency_payment",
+                    help="List variables that should not display parameter values in their tooltips",
+                    height=100
+                )
+                no_params_list = [v.strip() for v in no_params_input.split('\n') if v.strip()]
+            else:
+                no_params_list = []
         
         # Generate button
         generate_button = st.button("Generate Flowchart", type="primary", use_container_width=True)
@@ -630,6 +1044,10 @@ def main():
     with col2:
         st.header("Dependency Flowchart")
         
+        # Initialize no_params_list if not defined
+        if 'no_params_list' not in locals():
+            no_params_list = []
+            
         if generate_button and variable_name:
             # Clean the input variable name
             variable_name = variable_name.strip()
@@ -649,7 +1067,10 @@ def main():
                         max_depth=max_depth,
                         stop_variables=stop_variables,
                         expand_adds_subtracts=expand_adds_subtracts,
-                        show_parameters=show_parameters
+                        show_parameters=show_parameters,
+                        param_detail_level=param_detail_level if show_parameters else "Summary",
+                        param_date=param_date.strftime("%Y-%m-%d") if param_date else None,
+                        no_params_list=no_params_list if show_parameters else []
                     )
                     
                     # Check graph size and warn if very large
