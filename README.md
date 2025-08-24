@@ -24,6 +24,14 @@ pip install -r requirements.txt
 ```
 
 3. Set up PolicyEngine variable access:
+
+**For Streamlit Cloud deployment:**
+```bash
+# Initialize the submodule (already included in the repo)
+git submodule update --init --recursive
+```
+
+**For local development (optional - provides faster access):**
 ```bash
 # Clone PolicyEngine US repository (if not already cloned)
 git clone https://github.com/PolicyEngine/policyengine-us.git /path/to/policyengine-us
@@ -32,6 +40,8 @@ git clone https://github.com/PolicyEngine/policyengine-us.git /path/to/policyeng
 ln -s /path/to/policyengine-us/policyengine_us/variables ./policyengine_variables
 ln -s /path/to/policyengine-us/policyengine_us/parameters ./policyengine_parameters
 ```
+
+The app will automatically use the submodule if symlinks aren't available.
 
 ## Usage
 
@@ -56,15 +66,22 @@ The app will open in your browser at `http://localhost:8501`
 
 ### Updating Variable Data
 
-The app uses live data from PolicyEngine via symlinks. To update the data:
+**If using submodule (Streamlit Cloud):**
+```bash
+# Update the submodule to latest PolicyEngine version
+git submodule update --remote policyengine-us
+git add policyengine-us
+git commit -m "Update PolicyEngine submodule to latest version"
+```
 
+**If using symlinks (local development):**
 ```bash
 # Navigate to your PolicyEngine US directory and pull latest changes
 cd /path/to/policyengine-us
 git pull origin main
 ```
 
-The changes will automatically appear in your flow chart app since it reads directly from the symlinked folders.
+The changes will automatically appear in your flow chart app.
 
 ## Graph Legend
 
