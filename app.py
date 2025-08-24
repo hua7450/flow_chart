@@ -446,6 +446,10 @@ def main():
         )
         
         if input_method == "🔍 Search from list":
+            # Initialize session state for selected variable if not exists
+            if 'selected_variable' not in st.session_state:
+                st.session_state.selected_variable = ""
+            
             # Create searchable selectbox with all variables
             all_variable_names = sorted(variables.keys())
             
@@ -460,20 +464,25 @@ def main():
             if popular_available:
                 st.write("**Popular variables:**")
                 popular_cols = st.columns(min(3, len(popular_available)))
-                selected_popular = None
                 for i, var in enumerate(popular_available):
                     with popular_cols[i % len(popular_cols)]:
                         if st.button(var, key=f"pop_{var}"):
-                            selected_popular = var
+                            st.session_state.selected_variable = var
                 
-                if selected_popular:
-                    variable_name = selected_popular
-                else:
-                    variable_name = st.selectbox(
-                        "Or search all variables:",
-                        [""] + all_variable_names,
-                        help=f"Search among {len(all_variable_names)} PolicyEngine variables"
-                    )
+                # Use selectbox with the session state value
+                variable_name = st.selectbox(
+                    "Or search all variables:",
+                    [""] + all_variable_names,
+                    index=all_variable_names.index(st.session_state.selected_variable) + 1 if st.session_state.selected_variable in all_variable_names else 0,
+                    help=f"Search among {len(all_variable_names)} PolicyEngine variables",
+                    key="variable_selectbox"
+                )
+                
+                # Update session state if selectbox changes
+                if variable_name and variable_name != st.session_state.selected_variable:
+                    st.session_state.selected_variable = variable_name
+                elif not variable_name:
+                    variable_name = st.session_state.selected_variable
             else:
                 variable_name = st.selectbox(
                     "Select Variable:",
