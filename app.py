@@ -28,6 +28,32 @@ def load_variables():
     variables_dir = Path(__file__).parent / "policyengine-us" / "policyengine_us" / "variables"
     
     if not variables_dir.exists():
+        # Try to initialize submodule automatically
+        try:
+            import subprocess
+            import os
+            
+            # Change to the app directory
+            app_dir = Path(__file__).parent
+            result = subprocess.run(
+                ["git", "submodule", "update", "--init", "--recursive"],
+                cwd=app_dir,
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+            
+            if result.returncode == 0 and variables_dir.exists():
+                st.success("✅ Successfully initialized PolicyEngine submodule!")
+                # Rerun to load variables
+                st.rerun()
+            else:
+                st.error(f"Failed to initialize submodule. Return code: {result.returncode}")
+                st.error(f"Error: {result.stderr}")
+                
+        except Exception as e:
+            st.error(f"Error initializing submodule: {str(e)}")
+            
         st.error(f"Variables directory not found at: {variables_dir}")
         st.info("Please ensure the git submodule is initialized:")
         st.code("git submodule update --init --recursive")
