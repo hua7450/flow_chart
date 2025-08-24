@@ -24,19 +24,13 @@ st.set_page_config(
 # Cache the variables data
 @st.cache_data
 def load_variables():
-    """Load variables directly from the PolicyEngine submodule or symlink."""
-    # Try submodule path first (for Streamlit Cloud), then symlink (for local)
+    """Load variables directly from the PolicyEngine submodule."""
     variables_dir = Path(__file__).parent / "policyengine-us" / "policyengine_us" / "variables"
     
     if not variables_dir.exists():
-        # Fallback to symlink for local development
-        variables_dir = Path(__file__).parent / "policyengine_variables"
-        
-    if not variables_dir.exists():
-        st.error(f"Variables directory not found at either location:")
-        st.info("- policyengine-us/policyengine_us/variables (submodule)")
-        st.info("- policyengine_variables (symlink)")
-        st.info("Please ensure the git submodule is initialized or symlink is set up correctly.")
+        st.error(f"Variables directory not found at: {variables_dir}")
+        st.info("Please ensure the git submodule is initialized:")
+        st.code("git submodule update --init --recursive")
         return {}
     
     variables_data = {}
