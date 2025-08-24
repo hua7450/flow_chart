@@ -154,9 +154,44 @@ def build_dependency_graph(
         # Get variable data
         var_data = variables.get(var_name, {})
         
-        # Add description to node if available
+        # Enhanced tooltip with comprehensive information
+        tooltip_parts = []
+        
+        # Variable name and label
+        tooltip_parts.append(f"<b>{var_name}</b>")
+        if var_data.get("label") and var_data["label"] != var_name:
+            tooltip_parts.append(f"<i>{var_data['label']}</i>")
+        
+        # Description
         if var_data.get("description"):
-            node_data["title"] = var_data["description"]
+            tooltip_parts.append(f"<br><br>{var_data['description']}")
+        
+        # Unit
+        if var_data.get("unit"):
+            tooltip_parts.append(f"<br><b>Unit:</b> {var_data['unit']}")
+        
+        # File path (for developers)
+        if var_data.get("file_path"):
+            file_path = var_data["file_path"].replace("policyengine_us/variables/", "")
+            tooltip_parts.append(f"<br><b>File:</b> {file_path}")
+        
+        # Dependency counts
+        dep_counts = []
+        if var_data.get("adds"):
+            dep_counts.append(f"{len(var_data['adds'])} adds")
+        if var_data.get("subtracts"):
+            dep_counts.append(f"{len(var_data['subtracts'])} subtracts")
+        if var_data.get("variables"):
+            dep_counts.append(f"{len(var_data['variables'])} variables")
+        if var_data.get("parameters"):
+            dep_counts.append(f"{len(var_data['parameters'])} parameters")
+        if var_data.get("defined_for"):
+            dep_counts.append(f"{len(var_data['defined_for'])} conditions")
+        
+        if dep_counts:
+            tooltip_parts.append(f"<br><b>Dependencies:</b> {', '.join(dep_counts)}")
+        
+        node_data["title"] = "".join(tooltip_parts)
         
         nodes[var_name] = node_data
         
@@ -227,15 +262,39 @@ def create_flowchart(graph_data: Dict, show_labels: bool = True, show_parameters
     """
     net = Network(height="800px", width="100%", directed=True)
     
-    # Configure physics
-    net.barnes_hut(
-        gravity=-8000,
-        central_gravity=0.3,
-        spring_length=200,
-        spring_strength=0.01,
-        damping=0.4,
-        overlap=0
-    )
+    # Configure physics based on graph size for performance
+    num_nodes = len(graph_data["nodes"])
+    
+    if num_nodes > 100:
+        # Simplified physics for large graphs
+        net.barnes_hut(
+            gravity=-3000,
+            central_gravity=0.1,
+            spring_length=150,
+            spring_strength=0.005,
+            damping=0.6,
+            overlap=0
+        )
+    elif num_nodes > 50:
+        # Medium optimization
+        net.barnes_hut(
+            gravity=-5000,
+            central_gravity=0.2,
+            spring_length=180,
+            spring_strength=0.008,
+            damping=0.5,
+            overlap=0
+        )
+    else:
+        # Full physics for small graphs
+        net.barnes_hut(
+            gravity=-8000,
+            central_gravity=0.3,
+            spring_length=200,
+            spring_strength=0.01,
+            damping=0.4,
+            overlap=0
+        )
     
     # Add nodes
     for node_id, node_data in graph_data["nodes"].items():
@@ -309,43 +368,46 @@ def create_flowchart(graph_data: Dict, show_labels: bool = True, show_parameters
             smooth={"type": "dynamic"}
         )
     
-    # Set options
-    net.set_options("""
-    var options = {
-        "nodes": {
+    # Set options with performance optimization
+    stabilization_iterations = 50 if num_nodes > 100 else 100 if num_nodes > 50 else 200
+    hide_on_drag = num_nodes > 80  # Hide edges/nodes during drag for large graphs
+    
+    net.set_options(f"""
+    var options = {{
+        "nodes": {{
             "shape": "box",
             "margin": 10,
-            "widthConstraint": {
+            "widthConstraint": {{
                 "maximum": 200
-            }
-        },
-        "edges": {
-            "smooth": {
+            }}
+        }},
+        "edges": {{
+            "smooth": {{
                 "type": "dynamic"
-            },
-            "arrows": {
-                "to": {
+            }},
+            "arrows": {{
+                "to": {{
                     "enabled": true,
                     "scaleFactor": 0.5
-                }
-            }
-        },
-        "physics": {
+                }}
+            }}
+        }},
+        "physics": {{
             "enabled": true,
-            "stabilization": {
+            "stabilization": {{
                 "enabled": true,
-                "iterations": 100
-            }
-        },
-        "interaction": {
+                "iterations": {stabilization_iterations}
+            }}
+        }},
+        "interaction": {{
             "dragNodes": true,
-            "hideEdgesOnDrag": false,
-            "hideNodesOnDrag": false,
+            "hideEdgesOnDrag": {str(hide_on_drag).lower()},
+            "hideNodesOnDrag": {str(hide_on_drag).lower()},
             "hover": true,
             "navigationButtons": true,
             "keyboard": true
-        }
-    }
+        }}
+    }}
     """)
     
     # Generate HTML
@@ -466,6 +528,13 @@ def main():
         
         # Generate button
         generate_button = st.button("Generate Flowchart", type="primary", use_container_width=True)
+        
+        # Add performance warning if settings might create large graphs
+        if max_depth > 15 or (expand_adds_subtracts and max_depth > 10):
+            st.warning("⚠️ **Large Graph Warning:** These settings may create very large graphs. Consider:\n"
+                      "- Reducing max depth to 10 or less\n" 
+                      "- Adding stop variables\n"
+                      "- Disabling 'Expand Adds/Subtracts' for initial exploration")
     
     with col2:
         st.header("Dependency Flowchart")
@@ -492,8 +561,17 @@ def main():
                         show_parameters=show_parameters
                     )
                     
-                    # Display statistics
-                    st.info(f"Found {len(graph_data['nodes'])} nodes and {len(graph_data['edges'])} edges")
+                    # Check graph size and warn if very large
+                    num_nodes = len(graph_data['nodes'])
+                    num_edges = len(graph_data['edges'])
+                    
+                    if num_nodes > 100:
+                        st.warning(f"🐌 **Large Graph:** {num_nodes} nodes and {num_edges} edges. "
+                                 f"Rendering may be slow. Consider adding more stop variables or reducing depth.")
+                    elif num_nodes > 50:
+                        st.info(f"📊 **Medium Graph:** {num_nodes} nodes and {num_edges} edges. This may take a moment to render.")
+                    else:
+                        st.success(f"✅ **Manageable Graph:** {num_nodes} nodes and {num_edges} edges")
                     
                     # Create and display the flowchart
                     html_content = create_flowchart(
