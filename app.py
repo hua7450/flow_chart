@@ -12,6 +12,9 @@ from pyvis.network import Network
 import tempfile
 from typing import Dict, List, Set, Optional, Tuple
 
+# Import stop variables configuration
+from stop_variables_config import DEFAULT_STOP_VARIABLES, OPTIONAL_STOP_VARIABLES
+
 # Page config
 st.set_page_config(
     page_title="PolicyEngine Variable Dependency Visualizer",
@@ -524,16 +527,48 @@ def main():
                 help="Display parameter dependencies"
             )
             
-            # Stop variables
+            # Stop variables with common defaults
+            st.markdown("**Stop Variables** (won't expand these)")
+            st.caption("Edit stop_variables_config.py to customize this list")
+            
+            # Tab interface for default vs optional stop variables
+            stop_tab1, stop_tab2 = st.tabs(["Default Stops", "Optional Stops"])
+            
+            with stop_tab1:
+                # Default stop variables (pre-checked)
+                stop_cols1 = st.columns(2)
+                selected_default_stops = []
+                for i, stop_var in enumerate(DEFAULT_STOP_VARIABLES):
+                    with stop_cols1[i % 2]:
+                        if st.checkbox(stop_var, value=True, key=f"default_stop_{stop_var}"):
+                            selected_default_stops.append(stop_var)
+            
+            with stop_tab2:
+                # Optional stop variables (not pre-checked)
+                if OPTIONAL_STOP_VARIABLES:
+                    stop_cols2 = st.columns(2)
+                    selected_optional_stops = []
+                    for i, stop_var in enumerate(OPTIONAL_STOP_VARIABLES):
+                        with stop_cols2[i % 2]:
+                            if st.checkbox(stop_var, value=False, key=f"optional_stop_{stop_var}"):
+                                selected_optional_stops.append(stop_var)
+                else:
+                    selected_optional_stops = []
+            
+            # Combine selected stops
+            selected_stops = selected_default_stops + selected_optional_stops
+            
+            # Additional custom stop variables
             stop_variables_input = st.text_area(
-                "Stop Variables (one per line)",
-                placeholder="employment_income\nself_employment_income",
-                help="Variables to stop at (won't expand their dependencies)"
+                "Additional Stop Variables (one per line)",
+                placeholder="custom_variable_1\ncustom_variable_2",
+                help="Add more variables to stop at (won't expand their dependencies)",
+                height=100
             )
             
-            stop_variables = set()
-            if stop_variables_input:
-                stop_variables = {v.strip() for v in stop_variables_input.split('\n') if v.strip()}
+            # Combine selected checkboxes with custom input
+            custom_stops = [v.strip() for v in stop_variables_input.split('\n') if v.strip()]
+            stop_variables = set(selected_stops + custom_stops)
         
         # Generate button
         generate_button = st.button("Generate Flowchart", type="primary", use_container_width=True)
