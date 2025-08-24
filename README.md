@@ -7,7 +7,7 @@ An interactive web application that generates dependency flowcharts for PolicyEn
 - 🔍 **Interactive Visualization**: Explore variable dependencies with an interactive network graph
 - 📊 **Dependency Types**: Visualize formulas, additions, subtractions, and parameter dependencies
 - ⚙️ **Customizable**: Control depth, stop variables, and display options
-- 🚀 **Fast & Offline**: Pre-fetched data means instant loading with no API calls
+- 🚀 **Real-time Data**: Direct access to PolicyEngine variables via symlinks
 - 🎨 **Color-Coded**: Different colors for different dependency types
 
 ## Installation
@@ -21,6 +21,16 @@ cd flow_chart
 2. Install dependencies:
 ```bash
 pip install -r requirements.txt
+```
+
+3. Set up PolicyEngine variable access:
+```bash
+# Clone PolicyEngine US repository (if not already cloned)
+git clone https://github.com/PolicyEngine/policyengine-us.git /path/to/policyengine-us
+
+# Create symlinks to access variables and parameters
+ln -s /path/to/policyengine-us/policyengine_us/variables ./policyengine_variables
+ln -s /path/to/policyengine-us/policyengine_us/parameters ./policyengine_parameters
 ```
 
 ## Usage
@@ -46,13 +56,15 @@ The app will open in your browser at `http://localhost:8501`
 
 ### Updating Variable Data
 
-The app uses pre-fetched variable data from PolicyEngine. To update the data:
+The app uses live data from PolicyEngine via symlinks. To update the data:
 
 ```bash
-python fetch_variables.py
+# Navigate to your PolicyEngine US directory and pull latest changes
+cd /path/to/policyengine-us
+git pull origin main
 ```
 
-This will download the latest variables from the PolicyEngine US repository and save them to `variables.json`.
+The changes will automatically appear in your flow chart app since it reads directly from the symlinked folders.
 
 ## Graph Legend
 
@@ -76,7 +88,7 @@ This app can be deployed on [Streamlit Cloud](https://streamlit.io/cloud):
 - **Data Source**: [PolicyEngine US](https://github.com/policyengine/policyengine-us)
 - **Frontend**: Streamlit
 - **Visualization**: PyVis (vis-network)
-- **Data Storage**: Local JSON file (~1MB)
+- **Data Access**: Direct symlink access to PolicyEngine repository
 
 ## License
 

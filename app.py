@@ -5,15 +5,14 @@ A Streamlit web app that generates interactive dependency flowcharts for PolicyE
 """
 
 import streamlit as st
-import json
+import ast
 from pathlib import Path
-import re
 from pyvis.network import Network
 import tempfile
-from typing import Dict, List, Set, Optional, Tuple
+from typing import Dict, List, Set, Optional
 
 # Import stop variables configuration
-from stop_variables_config import DEFAULT_STOP_VARIABLES, OPTIONAL_STOP_VARIABLES
+from stop_variables_config import DEFAULT_STOP_VARIABLES
 
 # Page config
 st.set_page_config(
@@ -25,16 +24,132 @@ st.set_page_config(
 # Cache the variables data
 @st.cache_data
 def load_variables():
-    """Load the pre-fetched variables from JSON file."""
-    json_path = Path(__file__).parent / "variables.json"
+    """Load variables directly from the policyengine_variables folder."""
+    variables_dir = Path(__file__).parent / "policyengine_variables"
     
-    if not json_path.exists():
-        st.error(f"Variables data file not found at {json_path}")
-        st.info("Please run `python fetch_variables.py` to download the variables data.")
+    if not variables_dir.exists():
+        st.error(f"Variables directory not found at {variables_dir}")
+        st.info("Please ensure the policyengine_variables symlink is set up correctly.")
         return {}
     
-    with open(json_path, 'r') as f:
-        return json.load(f)
+    variables_data = {}
+    
+    # Walk through all Python files in the variables directory
+    for py_file in variables_dir.glob("**/*.py"):
+        if py_file.name.startswith("__"):
+            continue
+            
+        try:
+            # Parse the Python file to extract variable information
+            var_data = parse_variable_file(py_file)
+            if var_data:
+                var_name = py_file.stem
+                variables_data[var_name] = var_data
+        except Exception:
+            # Skip files that can't be parsed
+            continue
+    
+    return variables_data
+
+def parse_variable_file(file_path: Path) -> Optional[Dict]:
+    """Parse a Python variable file to extract metadata."""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Parse the AST
+        tree = ast.parse(content)
+        
+        # Find the Variable class definition
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and any(
+                isinstance(base, ast.Name) and base.id == "Variable" 
+                for base in node.bases
+            ):
+                return extract_variable_metadata(node, file_path)
+        
+        return None
+        
+    except Exception:
+        return None
+
+def extract_variable_metadata(class_node: ast.ClassDef, file_path: Path) -> Dict:
+    """Extract metadata from a Variable class AST node."""
+    metadata = {
+        "file_path": str(file_path.relative_to(Path(__file__).parent)),
+        "formula": None,
+        "adds": [],
+        "subtracts": [],
+        "parameters": [],
+        "variables": [],
+        "defined_for": [],
+        "description": None,
+        "label": None,
+        "unit": None
+    }
+    
+    # Extract class attributes
+    for node in class_node.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    attr_name = target.id
+                    value = extract_ast_value(node.value)
+                    
+                    if attr_name == "label" and isinstance(value, str):
+                        metadata["label"] = value
+                    elif attr_name == "documentation" and isinstance(value, str):
+                        metadata["description"] = value
+                    elif attr_name == "adds" and isinstance(value, list):
+                        metadata["adds"] = value
+                    elif attr_name == "subtracts" and isinstance(value, list):
+                        metadata["subtracts"] = value
+                    elif attr_name == "defined_for":
+                        if isinstance(value, str):
+                            metadata["defined_for"] = [value]
+                        elif isinstance(value, list):
+                            metadata["defined_for"] = value
+        
+        elif isinstance(node, ast.FunctionDef) and node.name == "formula":
+            # Extract variables used in the formula
+            formula_vars = extract_formula_variables(node)
+            metadata["variables"] = formula_vars
+            # Don't set formula as a string - let the variables list handle dependencies
+    
+    return metadata
+
+def extract_ast_value(node):
+    """Extract Python value from AST node."""
+    if isinstance(node, ast.Constant):
+        return node.value
+    elif isinstance(node, ast.List):
+        return [extract_ast_value(item) for item in node.elts]
+    elif isinstance(node, ast.Name):
+        return node.id
+    else:
+        try:
+            return str(ast.unparse(node)) if hasattr(ast, 'unparse') else None
+        except:
+            return None
+
+def extract_formula_variables(func_node: ast.FunctionDef) -> List[str]:
+    """Extract variable names used in a formula function."""
+    variables = set()
+    
+    for node in ast.walk(func_node):
+        if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name):
+            # Handle cases like person("variable_name", period)
+            if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+                variables.add(node.slice.value)
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            # Handle direct function calls that might reference variables
+            for arg in node.args:
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    # This might be a variable name
+                    if "_" in arg.value or arg.value.islower():
+                        variables.add(arg.value)
+    
+    return list(variables)
 
 def extract_dependencies_from_variable(variable_data: Dict) -> Dict[str, List[str]]:
     """
@@ -52,9 +167,8 @@ def extract_dependencies_from_variable(variable_data: Dict) -> Dict[str, List[st
         "defined_for": []
     }
     
-    # Get formula dependencies
-    if variable_data.get("formula"):
-        deps["formula"].append(variable_data["formula"])
+    # Formula dependencies are handled through the variables list
+    # No need to add formula as a separate dependency
     
     # Get adds dependencies
     if variable_data.get("adds"):
@@ -157,44 +271,11 @@ def build_dependency_graph(
         # Get variable data
         var_data = variables.get(var_name, {})
         
-        # Enhanced tooltip with comprehensive information
-        tooltip_parts = []
-        
-        # Variable name and label
-        tooltip_parts.append(f"<b>{var_name}</b>")
-        if var_data.get("label") and var_data["label"] != var_name:
-            tooltip_parts.append(f"<i>{var_data['label']}</i>")
-        
-        # Description
-        if var_data.get("description"):
-            tooltip_parts.append(f"<br><br>{var_data['description']}")
-        
-        # Unit
-        if var_data.get("unit"):
-            tooltip_parts.append(f"<br><b>Unit:</b> {var_data['unit']}")
-        
-        # File path (for developers)
-        if var_data.get("file_path"):
-            file_path = var_data["file_path"].replace("policyengine_us/variables/", "")
-            tooltip_parts.append(f"<br><b>File:</b> {file_path}")
-        
-        # Dependency counts
-        dep_counts = []
-        if var_data.get("adds"):
-            dep_counts.append(f"{len(var_data['adds'])} adds")
-        if var_data.get("subtracts"):
-            dep_counts.append(f"{len(var_data['subtracts'])} subtracts")
-        if var_data.get("variables"):
-            dep_counts.append(f"{len(var_data['variables'])} variables")
-        if var_data.get("parameters"):
-            dep_counts.append(f"{len(var_data['parameters'])} parameters")
-        if var_data.get("defined_for"):
-            dep_counts.append(f"{len(var_data['defined_for'])} conditions")
-        
-        if dep_counts:
-            tooltip_parts.append(f"<br><b>Dependencies:</b> {', '.join(dep_counts)}")
-        
-        node_data["title"] = "".join(tooltip_parts)
+        # Simple tooltip - only show label on hover/click
+        if var_data.get("label"):
+            node_data["title"] = var_data["label"]
+        else:
+            node_data["title"] = var_name  # Fallback if no label exists
         
         nodes[var_name] = node_data
         
@@ -209,36 +290,12 @@ def build_dependency_graph(
         # Process dependencies
         all_deps = extract_dependencies_from_variable(var_data)
         
-        # Process defined_for dependencies - expand them to get their dependencies
+        # Process defined_for dependencies - add them as direct dependencies
         for defined_for_var in all_deps["defined_for"]:
             defined_for_var = clean_variable_name(defined_for_var)
             if defined_for_var and defined_for_var != var_name:
-                # Get the dependencies of the defined_for variable
-                defined_for_data = variables.get(defined_for_var, {})
-                if defined_for_data:
-                    # Add all its dependencies directly to our variable
-                    defined_for_deps = extract_dependencies_from_variable(defined_for_data)
-                    
-                    # Add defined_for's own defined_for dependencies
-                    for subdep in defined_for_deps.get("defined_for", []):
-                        subdep = clean_variable_name(subdep)
-                        if subdep and subdep != var_name:
-                            traverse(subdep, depth + 1, var_name, "defined_for")
-                    
-                    # Add defined_for's variable dependencies
-                    for subdep in defined_for_deps.get("variables", []):
-                        subdep = clean_variable_name(subdep)
-                        if subdep and subdep != var_name:
-                            traverse(subdep, depth + 1, var_name, "formula")
-                    
-                    # Add defined_for's formula dependency
-                    for subdep in defined_for_deps.get("formula", []):
-                        subdep = clean_variable_name(subdep)
-                        if subdep and subdep != var_name:
-                            traverse(subdep, depth + 1, var_name, "formula")
-                else:
-                    # If we can't expand it, just add it as is
-                    traverse(defined_for_var, depth + 1, var_name, "defined_for")
+                # Add the defined_for variable as a direct dependency
+                traverse(defined_for_var, depth + 1, var_name, "defined_for")
         
         # Process variable references in formulas
         for dep in all_deps["variables"]:
@@ -276,7 +333,7 @@ def build_dependency_graph(
     
     return {"nodes": nodes, "edges": edges}
 
-def create_flowchart(graph_data: Dict, show_labels: bool = True, show_parameters: bool = True, layout_version: str = "v1") -> str:
+def create_flowchart(graph_data: Dict, show_labels: bool = True, show_parameters: bool = True) -> str:
     """
     Create an interactive flowchart using pyvis.
     
@@ -290,86 +347,40 @@ def create_flowchart(graph_data: Dict, show_labels: bool = True, show_parameters
     """
     net = Network(height="800px", width="100%", directed=True)
     
-    # Configure physics based on graph size for performance
-    num_nodes = len(graph_data["nodes"])
+    # Configure hierarchical layout
     
-    if num_nodes > 100:
-        # Simplified physics for large graphs
-        net.barnes_hut(
-            gravity=-1500,
-            central_gravity=0.05,
-            spring_length=400,
-            spring_strength=0.002,
-            damping=0.9,
-            overlap=0
-        )
-    elif num_nodes > 50:
-        # Medium optimization with better spacing
-        net.barnes_hut(
-            gravity=-2000,
-            central_gravity=0.1,
-            spring_length=450,
-            spring_strength=0.003,
-            damping=0.7,
-            overlap=0
-        )
-    else:
-        if layout_version == "v2":
-            # Version 2: Hierarchical tree layout - complete options
-            net.set_options('''
+    # Always use hierarchical tree layout
+    try:
+        # Try modern pyvis method first
+        if hasattr(net, 'set_options'):
+            net.set_options("""
             {
                 "layout": {
                     "hierarchical": {
                         "enabled": true,
                         "direction": "UD",
                         "sortMethod": "directed",
-                        "nodeSpacing": 200,
-                        "levelSeparation": 150,
-                        "treeSpacing": 200,
+                        "nodeSpacing": 180,
+                        "levelSeparation": 120,
+                        "treeSpacing": 150,
                         "blockShifting": true,
-                        "edgeMinimization": true,
-                        "parentCentralization": true
+                        "edgeMinimization": true
                     }
                 },
                 "physics": {
                     "enabled": false
-                },
-                "nodes": {
-                    "shape": "box",
-                    "margin": 10,
-                    "widthConstraint": {
-                        "maximum": 200
-                    }
-                },
-                "edges": {
-                    "smooth": {
-                        "type": "dynamic"
-                    },
-                    "arrows": {
-                        "to": {
-                            "enabled": true,
-                            "scaleFactor": 0.5
-                        }
-                    }
-                },
-                "interaction": {
-                    "dragNodes": true,
-                    "hover": true,
-                    "navigationButtons": true,
-                    "keyboard": true
                 }
             }
-            ''')
+            """)
         else:
-            # Version 1: Force-directed physics layout
-            net.barnes_hut(
-                gravity=-2500,
-                central_gravity=0.1,
-                spring_length=500,
-                spring_strength=0.004,
-                damping=0.6,
-                overlap=0
-            )
+            # Fallback for older versions
+            net.toggle_physics(False)
+    except Exception:
+        # Last resort - just disable physics
+        try:
+            net.toggle_physics(False)
+        except:
+            pass
     
     # Keep track of which nodes were actually added to the visualization
     added_nodes = set()
@@ -447,48 +458,7 @@ def create_flowchart(graph_data: Dict, show_labels: bool = True, show_parameters
             font={"size": 10, "color": "#444444"}
         )
     
-    # Set options with performance optimization (skip for hierarchical layout)
-    if layout_version != "v2":
-        stabilization_iterations = 50 if num_nodes > 100 else 100 if num_nodes > 50 else 200
-        hide_on_drag = num_nodes > 80  # Hide edges/nodes during drag for large graphs
-        
-        net.set_options(f"""
-    var options = {{
-        "nodes": {{
-            "shape": "box",
-            "margin": 10,
-            "widthConstraint": {{
-                "maximum": 200
-            }}
-        }},
-        "edges": {{
-            "smooth": {{
-                "type": "dynamic"
-            }},
-            "arrows": {{
-                "to": {{
-                    "enabled": true,
-                    "scaleFactor": 0.5
-                }}
-            }}
-        }},
-        "physics": {{
-            "enabled": true,
-            "stabilization": {{
-                "enabled": true,
-                "iterations": {stabilization_iterations}
-            }}
-        }},
-        "interaction": {{
-            "dragNodes": true,
-            "hideEdgesOnDrag": {str(hide_on_drag).lower()},
-            "hideNodesOnDrag": {str(hide_on_drag).lower()},
-            "hover": true,
-            "navigationButtons": true,
-            "keyboard": true
-        }}
-    }}
-    """)
+    # Skip advanced options for compatibility - pyvis will use defaults
     
     # Generate HTML
     with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False) as f:
@@ -604,13 +574,7 @@ def main():
                 help="Display parameter dependencies"
             )
             
-            # Layout version toggle
-            layout_version = st.radio(
-                "Layout Style",
-                ["v1", "v2"],
-                format_func=lambda x: "Version 1 (Force-directed)" if x == "v1" else "Version 2 (Hierarchical Tree)",
-                help="Version 1: Physics-based layout with flexible positioning\nVersion 2: Tree structure with inputs at bottom, target at top"
-            )
+            # Always use hierarchical tree layout
             
             # User-defined stop variables (optional)
             stop_variables_input = st.text_area(
@@ -678,7 +642,6 @@ def main():
                         graph_data,
                         show_labels=show_labels,
                         show_parameters=show_parameters,
-                        layout_version=layout_version
                     )
                     
                     # Display the interactive graph
