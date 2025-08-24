@@ -38,6 +38,7 @@ function App() {
   const [variables, setVariables] = useState<Variable[]>([]);
   const [selectedVariable, setSelectedVariable] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [showSearchResults, setShowSearchResults] = useState<boolean>(false);
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -53,10 +54,25 @@ function App() {
   
   const networkContainer = useRef<HTMLDivElement>(null);
   const networkInstance = useRef<Network | null>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   // Load variables on mount
   useEffect(() => {
     loadVariables();
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowSearchResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   const loadVariables = async () => {
@@ -72,7 +88,10 @@ function App() {
   };
 
   const searchVariables = async (query: string) => {
-    if (query.length < 2) return;
+    if (query.length < 2) {
+      setShowSearchResults(false);
+      return;
+    }
     
     try {
       const response = await axios.get(`${API_BASE}/search`, {
@@ -80,10 +99,19 @@ function App() {
       });
       if (response.data.success) {
         setVariables(response.data.results);
+        setShowSearchResults(true);
       }
     } catch (err) {
       console.error('Search failed:', err);
     }
+  };
+
+  const selectVariable = (variableName: string) => {
+    setSelectedVariable(variableName);
+    setSearchTerm('');
+    setShowSearchResults(false);
+    // Reload all variables to reset the list
+    loadVariables();
   };
 
   const generateFlowchart = async () => {
@@ -167,9 +195,14 @@ function App() {
       },
       interaction: {
         hover: true,
-        tooltipDelay: 100,
+        tooltipDelay: 300,
+        hideEdgesOnDrag: false,
+        hideNodesOnDrag: false,
         zoomView: true,
         dragView: true
+      },
+      configure: {
+        enabled: false
       }
     };
 
@@ -205,50 +238,66 @@ function App() {
     : variables;
 
   return (
-    <div className="flex flex-row h-screen bg-gray-50">
+    <div className="h-screen bg-gray-50" style={{ display: 'flex', flexDirection: 'row' }}>
       {/* Sidebar */}
-      <div className="w-80 bg-white shadow-lg p-4 overflow-y-auto flex-shrink-0 border-r border-gray-200">
+      <div className="bg-white shadow p-3 overflow-y-auto border-r border-gray-200" style={{ width: '300px', flexShrink: 0 }}>
         <h1 className="text-xl font-bold mb-4 text-gray-800">
           PolicyEngine Flowchart
         </h1>
 
         {/* Variable Selection */}
-        <div className="mb-4">
+        <div className="mb-4 relative" ref={searchContainerRef}>
           <label className="block text-xs font-medium text-gray-700 mb-1">
-            Search Variables
+            {selectedVariable ? `Selected: ${selectedVariable}` : 'Or search all variables:'}
           </label>
           <input
             type="text"
-            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Type to search..."
+            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+            placeholder={selectedVariable ? selectedVariable : "Type variable name..."}
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
-              if (e.target.value.length >= 2) {
-                searchVariables(e.target.value);
-              }
+              searchVariables(e.target.value);
+            }}
+            onFocus={() => {
+              if (searchTerm.length >= 2) setShowSearchResults(true);
             }}
           />
+          
+          {/* Search Results Dropdown */}
+          {showSearchResults && searchTerm.length >= 2 && (
+            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded shadow-sm max-h-48 overflow-y-auto">
+              {filteredVariables.slice(0, 6).map(v => (
+                <div
+                  key={v.name}
+                  className="px-2 py-1 cursor-pointer hover:bg-gray-100 text-xs font-mono border-b border-gray-100 last:border-b-0"
+                  onClick={() => selectVariable(v.name)}
+                >
+                  {v.name}
+                </div>
+              ))}
+              {filteredVariables.length === 0 && (
+                <div className="px-2 py-1 text-xs text-gray-500">No variables found</div>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="mb-4">
-          <label className="block text-xs font-medium text-gray-700 mb-1">
-            Or select from all variables:
-          </label>
-          <select
-            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={selectedVariable}
-            onChange={(e) => setSelectedVariable(e.target.value)}
-            size={8}
-          >
-            <option value="">Select a variable...</option>
-            {filteredVariables.map(v => (
-              <option key={v.name} value={v.name}>
-                {v.name} {v.hasParameters && '📊'}
-              </option>
-            ))}
-          </select>
-        </div>
+        {selectedVariable && (
+          <div className="mb-4">
+            <button
+              onClick={() => {
+                setSelectedVariable('');
+                setSearchTerm('');
+                setShowSearchResults(false);
+                loadVariables();
+              }}
+              className="text-xs text-blue-600 hover:text-blue-800"
+            >
+              Clear selection
+            </button>
+          </div>
+        )}
 
         {/* Advanced Options */}
         <details className="mb-4">
@@ -379,13 +428,11 @@ function App() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 h-full">
-        <div className="bg-white m-2 rounded-lg shadow-lg flex-1 flex flex-col min-h-0">
-          <h2 className="text-lg font-semibold p-4 pb-2 text-gray-800 flex-shrink-0">
-            Dependency Flowchart
-          </h2>
-          <div ref={networkContainer} className="flex-1 min-h-0 mx-4 mb-4 border border-gray-200 rounded" />
-        </div>
+      <div className="bg-white" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh' }}>
+        <h2 className="text-lg font-semibold px-3 py-2 text-gray-800 border-b border-gray-100" style={{ flexShrink: 0 }}>
+          Dependency Flowchart
+        </h2>
+        <div ref={networkContainer} style={{ flex: 1, minHeight: 0, width: '100%' }} />
       </div>
     </div>
   );

@@ -32,18 +32,23 @@
 
 /* Tooltip styles */
 .vis-tooltip {
-  position: absolute;
+  position: absolute !important;
   visibility: hidden;
-  padding: 10px;
-  white-space: pre-line;
-  font-family: monospace;
-  font-size: 12px;
-  background-color: rgba(0, 0, 0, 0.9);
-  color: white;
-  border-radius: 6px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  max-width: 400px;
-  z-index: 1000;
+  padding: 8px 10px !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+  background-color: rgba(0, 0, 0, 0.85) !important;
+  color: white !important;
+  border-radius: 4px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  max-width: 300px !important;
+  min-width: 200px !important;
+  z-index: 9999 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 
 /* Loading spinner */
