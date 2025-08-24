@@ -290,7 +290,7 @@ def detect_parameter_structure(param_data: Dict) -> str:
         return "numeric_index"
     
     # Check if category based (uppercase keys)
-    if sample_key.isupper():
+    if isinstance(sample_key, str) and sample_key.isupper():
         # Check nesting depth
         sample_value = param_data[sample_key]
         if isinstance(sample_value, dict):
@@ -300,7 +300,7 @@ def detect_parameter_structure(param_data: Dict) -> str:
                 if str(sub_key).isdigit():
                     # Like LIHEAP - housing type -> income level -> household size
                     return "nested_3_level"
-                elif sub_key.isupper():
+                elif isinstance(sub_key, str) and sub_key.isupper():
                     # Like reimbursement rates
                     return "nested_3_level_category"
         return "category"
