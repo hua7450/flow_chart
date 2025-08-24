@@ -126,8 +126,8 @@ def build_dependency_graph(
             # Still add the edge even if visited
             if parent:
                 edges.append({
-                    "from": parent,
-                    "to": var_name,
+                    "from": var_name,
+                    "to": parent,
                     "type": edge_type
                 })
             return
@@ -148,8 +148,8 @@ def build_dependency_graph(
             nodes[var_name] = node_data
             if parent:
                 edges.append({
-                    "from": parent,
-                    "to": var_name,
+                    "from": var_name,
+                    "to": parent,
                     "type": edge_type
                 })
             return
@@ -209,11 +209,36 @@ def build_dependency_graph(
         # Process dependencies
         all_deps = extract_dependencies_from_variable(var_data)
         
-        # Process defined_for dependencies (always show these)
-        for dep in all_deps["defined_for"]:
-            dep = clean_variable_name(dep)
-            if dep and dep != var_name:
-                traverse(dep, depth + 1, var_name, "defined_for")
+        # Process defined_for dependencies - expand them to get their dependencies
+        for defined_for_var in all_deps["defined_for"]:
+            defined_for_var = clean_variable_name(defined_for_var)
+            if defined_for_var and defined_for_var != var_name:
+                # Get the dependencies of the defined_for variable
+                defined_for_data = variables.get(defined_for_var, {})
+                if defined_for_data:
+                    # Add all its dependencies directly to our variable
+                    defined_for_deps = extract_dependencies_from_variable(defined_for_data)
+                    
+                    # Add defined_for's own defined_for dependencies
+                    for subdep in defined_for_deps.get("defined_for", []):
+                        subdep = clean_variable_name(subdep)
+                        if subdep and subdep != var_name:
+                            traverse(subdep, depth + 1, var_name, "defined_for")
+                    
+                    # Add defined_for's variable dependencies
+                    for subdep in defined_for_deps.get("variables", []):
+                        subdep = clean_variable_name(subdep)
+                        if subdep and subdep != var_name:
+                            traverse(subdep, depth + 1, var_name, "formula")
+                    
+                    # Add defined_for's formula dependency
+                    for subdep in defined_for_deps.get("formula", []):
+                        subdep = clean_variable_name(subdep)
+                        if subdep and subdep != var_name:
+                            traverse(subdep, depth + 1, var_name, "formula")
+                else:
+                    # If we can't expand it, just add it as is
+                    traverse(defined_for_var, depth + 1, var_name, "defined_for")
         
         # Process variable references in formulas
         for dep in all_deps["variables"]:
@@ -251,7 +276,7 @@ def build_dependency_graph(
     
     return {"nodes": nodes, "edges": edges}
 
-def create_flowchart(graph_data: Dict, show_labels: bool = True, show_parameters: bool = True) -> str:
+def create_flowchart(graph_data: Dict, show_labels: bool = True, show_parameters: bool = True, layout_version: str = "v1") -> str:
     """
     Create an interactive flowchart using pyvis.
     
@@ -271,40 +296,86 @@ def create_flowchart(graph_data: Dict, show_labels: bool = True, show_parameters
     if num_nodes > 100:
         # Simplified physics for large graphs
         net.barnes_hut(
-            gravity=-3000,
-            central_gravity=0.1,
-            spring_length=150,
-            spring_strength=0.005,
-            damping=0.6,
+            gravity=-1500,
+            central_gravity=0.05,
+            spring_length=400,
+            spring_strength=0.002,
+            damping=0.9,
             overlap=0
         )
     elif num_nodes > 50:
-        # Medium optimization
+        # Medium optimization with better spacing
         net.barnes_hut(
-            gravity=-5000,
-            central_gravity=0.2,
-            spring_length=180,
-            spring_strength=0.008,
-            damping=0.5,
+            gravity=-2000,
+            central_gravity=0.1,
+            spring_length=450,
+            spring_strength=0.003,
+            damping=0.7,
             overlap=0
         )
     else:
-        # Full physics for small graphs
-        net.barnes_hut(
-            gravity=-8000,
-            central_gravity=0.3,
-            spring_length=200,
-            spring_strength=0.01,
-            damping=0.4,
-            overlap=0
-        )
+        if layout_version == "v2":
+            # Version 2: Hierarchical tree layout - complete options
+            net.set_options('''
+            {
+                "layout": {
+                    "hierarchical": {
+                        "enabled": true,
+                        "direction": "UD",
+                        "sortMethod": "directed",
+                        "nodeSpacing": 200,
+                        "levelSeparation": 150,
+                        "treeSpacing": 200,
+                        "blockShifting": true,
+                        "edgeMinimization": true,
+                        "parentCentralization": true
+                    }
+                },
+                "physics": {
+                    "enabled": false
+                },
+                "nodes": {
+                    "shape": "box",
+                    "margin": 10,
+                    "widthConstraint": {
+                        "maximum": 200
+                    }
+                },
+                "edges": {
+                    "smooth": {
+                        "type": "dynamic"
+                    },
+                    "arrows": {
+                        "to": {
+                            "enabled": true,
+                            "scaleFactor": 0.5
+                        }
+                    }
+                },
+                "interaction": {
+                    "dragNodes": true,
+                    "hover": true,
+                    "navigationButtons": true,
+                    "keyboard": true
+                }
+            }
+            ''')
+        else:
+            # Version 1: Force-directed physics layout
+            net.barnes_hut(
+                gravity=-2500,
+                central_gravity=0.1,
+                spring_length=500,
+                spring_strength=0.004,
+                damping=0.6,
+                overlap=0
+            )
+    
+    # Keep track of which nodes were actually added to the visualization
+    added_nodes = set()
     
     # Add nodes
     for node_id, node_data in graph_data["nodes"].items():
-        if not show_parameters and "_" in node_id and node_data.get("type") == "variable":
-            # Skip parameter nodes if not showing them
-            continue
-        
         # Set node color based on type
         if node_data.get("type") == "stop":
             color = "#ff9999"  # Light red for stop variables
@@ -313,12 +384,16 @@ def create_flowchart(graph_data: Dict, show_labels: bool = True, show_parameters
         else:
             color = "#87CEEB"  # Light blue for dependencies
         
-        # Prepare node attributes
+        # Prepare node attributes with better styling
         node_attrs = {
             "color": color,
-            "font": {"size": 14},
+            "font": {"size": 12, "face": "Arial", "color": "#333333"},
             "borderWidth": 2,
-            "borderWidthSelected": 4
+            "borderWidthSelected": 4,
+            "shape": "box",
+            "margin": 8,
+            "widthConstraint": {"maximum": 180},
+            "heightConstraint": {"minimum": 35}
         }
         
         # Add label if enabled
@@ -333,17 +408,16 @@ def create_flowchart(graph_data: Dict, show_labels: bool = True, show_parameters
             title=title,
             **node_attrs
         )
+        added_nodes.add(node_id)
     
     # Add edges
     for edge in graph_data["edges"]:
         from_node = edge["from"]
         to_node = edge["to"]
         
-        # Skip edges from parameter nodes if not showing them
-        if not show_parameters and "_" in from_node:
-            node_data = graph_data["nodes"].get(from_node, {})
-            if node_data.get("type") == "variable":
-                continue
+        # Only add edge if both nodes were actually added to the visualization
+        if from_node not in added_nodes or to_node not in added_nodes:
+            continue
         
         # Set edge color based on type
         if edge["type"] == "adds":
@@ -368,14 +442,17 @@ def create_flowchart(graph_data: Dict, show_labels: bool = True, show_parameters
             color=edge_color,
             label=edge_label,
             arrows="to",
-            smooth={"type": "dynamic"}
+            width=2,
+            smooth={"type": "curvedCW", "roundness": 0.1},
+            font={"size": 10, "color": "#444444"}
         )
     
-    # Set options with performance optimization
-    stabilization_iterations = 50 if num_nodes > 100 else 100 if num_nodes > 50 else 200
-    hide_on_drag = num_nodes > 80  # Hide edges/nodes during drag for large graphs
-    
-    net.set_options(f"""
+    # Set options with performance optimization (skip for hierarchical layout)
+    if layout_version != "v2":
+        stabilization_iterations = 50 if num_nodes > 100 else 100 if num_nodes > 50 else 200
+        hide_on_drag = num_nodes > 80  # Hide edges/nodes during drag for large graphs
+        
+        net.set_options(f"""
     var options = {{
         "nodes": {{
             "shape": "box",
@@ -527,48 +604,27 @@ def main():
                 help="Display parameter dependencies"
             )
             
-            # Stop variables with common defaults
-            st.markdown("**Stop Variables** (won't expand these)")
-            st.caption("Edit stop_variables_config.py to customize this list")
+            # Layout version toggle
+            layout_version = st.radio(
+                "Layout Style",
+                ["v1", "v2"],
+                format_func=lambda x: "Version 1 (Force-directed)" if x == "v1" else "Version 2 (Hierarchical Tree)",
+                help="Version 1: Physics-based layout with flexible positioning\nVersion 2: Tree structure with inputs at bottom, target at top"
+            )
             
-            # Tab interface for default vs optional stop variables
-            stop_tab1, stop_tab2 = st.tabs(["Default Stops", "Optional Stops"])
-            
-            with stop_tab1:
-                # Default stop variables (pre-checked)
-                stop_cols1 = st.columns(2)
-                selected_default_stops = []
-                for i, stop_var in enumerate(DEFAULT_STOP_VARIABLES):
-                    with stop_cols1[i % 2]:
-                        if st.checkbox(stop_var, value=True, key=f"default_stop_{stop_var}"):
-                            selected_default_stops.append(stop_var)
-            
-            with stop_tab2:
-                # Optional stop variables (not pre-checked)
-                if OPTIONAL_STOP_VARIABLES:
-                    stop_cols2 = st.columns(2)
-                    selected_optional_stops = []
-                    for i, stop_var in enumerate(OPTIONAL_STOP_VARIABLES):
-                        with stop_cols2[i % 2]:
-                            if st.checkbox(stop_var, value=False, key=f"optional_stop_{stop_var}"):
-                                selected_optional_stops.append(stop_var)
-                else:
-                    selected_optional_stops = []
-            
-            # Combine selected stops
-            selected_stops = selected_default_stops + selected_optional_stops
-            
-            # Additional custom stop variables
+            # User-defined stop variables (optional)
             stop_variables_input = st.text_area(
-                "Additional Stop Variables (one per line)",
-                placeholder="custom_variable_1\ncustom_variable_2",
-                help="Add more variables to stop at (won't expand their dependencies)",
+                "Stop Variables (optional)",
+                placeholder="employment_income\nself_employment_income\npension_income",
+                help="Add variables to stop at if the graph is too complex. These won't expand their dependencies.",
                 height=100
             )
             
-            # Combine selected checkboxes with custom input
+            # Parse user input
             custom_stops = [v.strip() for v in stop_variables_input.split('\n') if v.strip()]
-            stop_variables = set(selected_stops + custom_stops)
+            
+            # Combine with hidden default stops (DEFAULT_STOP_VARIABLES work silently in background)
+            stop_variables = set(DEFAULT_STOP_VARIABLES + custom_stops)
         
         # Generate button
         generate_button = st.button("Generate Flowchart", type="primary", use_container_width=True)
@@ -621,7 +677,8 @@ def main():
                     html_content = create_flowchart(
                         graph_data,
                         show_labels=show_labels,
-                        show_parameters=show_parameters
+                        show_parameters=show_parameters,
+                        layout_version=layout_version
                     )
                     
                     # Display the interactive graph

@@ -230,7 +230,8 @@ def parse_variable_file(content: str, file_path: str) -> Optional[Dict]:
                         # Look for patterns like: person("variable_name", period)
                         # or tax_unit("variable_name", period)
                         # or household("variable_name", period)
-                        var_refs = re.findall(r'(?:person|tax_unit|household|spm_unit|family)\(["\']([^"\']+)["\']', formula_line)
+                        # Handle both single-line and multi-line calls
+                        var_refs = re.findall(r'(?:person|tax_unit|household|spm_unit|family)\s*\(\s*["\']([^"\']+)["\']', formula_line)
                         for var_ref in var_refs:
                             if var_ref and var_ref not in variable_data["variables"]:
                                 variable_data["variables"].append(var_ref)

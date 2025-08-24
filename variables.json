@@ -8519,6 +8519,8 @@
       "gov.local.ca.riv.cap.share.payment.trash"
     ],
     "variables": [
+      "pre_subsidy_electricity_expense",
+      "ca_riv_share_electricity_emergency_payment",
       "water_expense",
       "trash_expense"
     ],
