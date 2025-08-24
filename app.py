@@ -376,12 +376,54 @@ def main():
     with col1:
         st.header("Configuration")
         
-        # Variable input
-        variable_name = st.text_input(
-            "Variable Name",
-            placeholder="e.g., household_net_income",
-            help="Enter the name of the PolicyEngine variable to visualize"
+        # Variable input with search
+        input_method = st.radio(
+            "Choose input method:",
+            ["🔍 Search from list", "⌨️ Type manually"],
+            horizontal=True
         )
+        
+        if input_method == "🔍 Search from list":
+            # Create searchable selectbox with all variables
+            all_variable_names = sorted(variables.keys())
+            
+            # Add some popular variables at the top
+            popular_vars = [
+                "household_net_income", "federal_income_tax", "eitc", "snap", 
+                "dc_agi", "ca_income_tax", "medicaid", "ssi", "social_security"
+            ]
+            popular_available = [v for v in popular_vars if v in variables]
+            
+            # Combine popular + all others
+            if popular_available:
+                st.write("**Popular variables:**")
+                popular_cols = st.columns(min(3, len(popular_available)))
+                selected_popular = None
+                for i, var in enumerate(popular_available):
+                    with popular_cols[i % len(popular_cols)]:
+                        if st.button(var, key=f"pop_{var}"):
+                            selected_popular = var
+                
+                if selected_popular:
+                    variable_name = selected_popular
+                else:
+                    variable_name = st.selectbox(
+                        "Or search all variables:",
+                        [""] + all_variable_names,
+                        help=f"Search among {len(all_variable_names)} PolicyEngine variables"
+                    )
+            else:
+                variable_name = st.selectbox(
+                    "Select Variable:",
+                    [""] + all_variable_names,
+                    help=f"Search among {len(all_variable_names)} PolicyEngine variables"
+                )
+        else:
+            variable_name = st.text_input(
+                "Variable Name",
+                placeholder="e.g., household_net_income",
+                help="Enter the name of the PolicyEngine variable to visualize"
+            )
         
         # Advanced options
         with st.expander("Advanced Options"):
