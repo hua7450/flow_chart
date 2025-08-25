@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { Network } from 'vis-network/standalone';
 import axios from 'axios';
+import PolicyEngineTheme from './theme';
 
 // Types
 interface Variable {
@@ -238,10 +239,15 @@ function App() {
     : variables;
 
   return (
-    <div className="h-screen bg-gray-50" style={{ display: 'flex', flexDirection: 'row' }}>
+    <div className="h-screen" style={{ display: 'flex', flexDirection: 'row', backgroundColor: PolicyEngineTheme.colors.BLUE_98 }}>
       {/* Sidebar */}
-      <div className="bg-white shadow p-3 overflow-y-auto border-r border-gray-200" style={{ width: '300px', flexShrink: 0 }}>
-        <h1 className="text-xl font-bold mb-4 text-gray-800">
+      <div className="shadow p-3 overflow-y-auto" style={{ 
+        width: '300px', 
+        flexShrink: 0,
+        backgroundColor: PolicyEngineTheme.colors.WHITE,
+        borderRight: `1px solid ${PolicyEngineTheme.colors.MEDIUM_DARK_GRAY}`
+      }}>
+        <h1 className="text-xl font-bold mb-4" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
           PolicyEngine Flowchart
         </h1>
 
@@ -252,15 +258,22 @@ function App() {
           </label>
           <input
             type="text"
-            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+            className="w-full px-2 py-1 text-xs rounded focus:outline-none"
+            style={{
+              border: `1px solid ${PolicyEngineTheme.colors.MEDIUM_DARK_GRAY}`
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = PolicyEngineTheme.colors.TEAL_ACCENT;
+              if (searchTerm.length >= 2) setShowSearchResults(true);
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = PolicyEngineTheme.colors.MEDIUM_DARK_GRAY;
+            }}
             placeholder={selectedVariable ? selectedVariable : "Type variable name..."}
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
               searchVariables(e.target.value);
-            }}
-            onFocus={() => {
-              if (searchTerm.length >= 2) setShowSearchResults(true);
             }}
           />
           
@@ -292,7 +305,10 @@ function App() {
                 setShowSearchResults(false);
                 loadVariables();
               }}
-              className="text-xs text-blue-600 hover:text-blue-800"
+              className="text-xs transition-colors"
+              style={{ color: PolicyEngineTheme.colors.TEAL_ACCENT }}
+              onMouseEnter={(e) => e.currentTarget.style.color = PolicyEngineTheme.colors.TEAL_PRESSED}
+              onMouseLeave={(e) => e.currentTarget.style.color = PolicyEngineTheme.colors.TEAL_ACCENT}
             >
               Clear selection
             </button>
@@ -407,7 +423,20 @@ function App() {
         <button
           onClick={generateFlowchart}
           disabled={loading || !selectedVariable}
-          className="w-full bg-blue-600 text-white py-2 rounded text-sm font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          className="w-full text-white py-2 rounded text-sm font-medium disabled:cursor-not-allowed transition-colors"
+          style={{ 
+            backgroundColor: loading || !selectedVariable ? PolicyEngineTheme.colors.MEDIUM_LIGHT_GRAY : PolicyEngineTheme.colors.BLUE_PRIMARY
+          }}
+          onMouseEnter={(e) => {
+            if (!loading && selectedVariable) {
+              e.currentTarget.style.backgroundColor = PolicyEngineTheme.colors.DARK_BLUE_HOVER;
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!loading && selectedVariable) {
+              e.currentTarget.style.backgroundColor = PolicyEngineTheme.colors.BLUE_PRIMARY;
+            }
+          }}
         >
           {loading ? 'Generating...' : 'Generate Flowchart'}
         </button>
@@ -421,15 +450,30 @@ function App() {
 
         {/* Graph Stats */}
         {graphData && (
-          <div className="mt-3 p-2 bg-green-100 border border-green-400 text-green-700 rounded text-xs">
+          <div className="mt-3 p-2 rounded text-xs" style={{
+            backgroundColor: PolicyEngineTheme.colors.TEAL_LIGHT,
+            border: `1px solid ${PolicyEngineTheme.colors.TEAL_ACCENT}`,
+            color: PolicyEngineTheme.colors.DARKEST_BLUE
+          }}>
             ✅ Graph: {graphData.nodes.length} nodes, {graphData.edges.length} edges
           </div>
         )}
       </div>
 
       {/* Main Content */}
-      <div className="bg-white" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh' }}>
-        <h2 className="text-lg font-semibold px-3 py-2 text-gray-800 border-b border-gray-100" style={{ flexShrink: 0 }}>
+      <div style={{ 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        minWidth: 0, 
+        height: '100vh',
+        backgroundColor: PolicyEngineTheme.colors.WHITE
+      }}>
+        <h2 className="text-lg font-semibold px-3 py-2" style={{ 
+          flexShrink: 0,
+          color: PolicyEngineTheme.colors.DARKEST_BLUE,
+          borderBottom: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`
+        }}>
           Dependency Flowchart
         </h2>
         <div ref={networkContainer} style={{ flex: 1, minHeight: 0, width: '100%' }} />

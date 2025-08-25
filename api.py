@@ -138,32 +138,35 @@ def generate_graph():
         for node_id, node_data in graph_data['nodes'].items():
             node_type = node_data.get('type', 'variable')
             
-            # Better color scheme with border and background
+            # PolicyEngine brand colors
             if node_data['level'] == 0:
+                # Target node - Teal accent
                 color = {
-                    'background': '#90EE90',
-                    'border': '#4CAF50',
+                    'background': '#39C6C0',  # TEAL_ACCENT
+                    'border': '#227773',      # TEAL_PRESSED
                     'highlight': {
-                        'background': '#7DD87D',
-                        'border': '#4CAF50'
+                        'background': '#39C6C0',
+                        'border': '#227773'
                     }
                 }
             elif node_type == 'stop':
+                # Stop node - Light background with red border
                 color = {
-                    'background': '#ffb3b3',
-                    'border': '#ff6666',
+                    'background': '#F7FAFD',  # BLUE_98
+                    'border': '#b50d0d',      # DARK_RED
                     'highlight': {
-                        'background': '#ff9999',
-                        'border': '#ff6666'
+                        'background': '#ffebeb',
+                        'border': '#b50d0d'
                     }
                 }
             else:
+                # Normal node - Blue theme
                 color = {
-                    'background': '#b3d9ff',
-                    'border': '#66b3ff',
+                    'background': '#D8E6F3',  # BLUE_LIGHT
+                    'border': '#2C6496',      # BLUE_PRIMARY
                     'highlight': {
-                        'background': '#99ccff',
-                        'border': '#66b3ff'
+                        'background': '#F7FAFD',  # BLUE_98
+                        'border': '#2C6496'
                     }
                 }
             
@@ -188,11 +191,14 @@ def generate_graph():
         edges = []
         for edge in graph_data['edges']:
             if edge['type'] == 'adds':
-                edge_color = {'color': '#00cc00', 'highlight': '#00ff00'}
+                # Green for additions
+                edge_color = {'color': '#29d40f', 'highlight': '#29d40f'}  # GREEN
             elif edge['type'] == 'subtracts':
-                edge_color = {'color': '#cc0000', 'highlight': '#ff0000'}
+                # Red for subtractions
+                edge_color = {'color': '#b50d0d', 'highlight': '#b50d0d'}  # DARK_RED
             else:
-                edge_color = {'color': '#666666', 'highlight': '#999999'}
+                # Gray for normal dependencies
+                edge_color = {'color': '#808080', 'highlight': '#616161'}  # GRAY/DARK_GRAY
                 
             edges.append({
                 'from': edge['from'],
