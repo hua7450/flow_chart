@@ -57,6 +57,15 @@ const ClearIcon = () => (
   </svg>
 );
 
+const GraphIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="3"></circle>
+    <line x1="12" y1="1" x2="12" y2="9"></line>
+    <line x1="15" y1="12" x2="23" y2="12"></line>
+    <line x1="4.22" y1="4.22" x2="9.17" y2="9.17"></line>
+  </svg>
+);
+
 const LoadingSpinner = () => (
   <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
 );
@@ -203,34 +212,21 @@ function App() {
       },
       nodes: {
         borderWidth: 2,
-        borderWidthSelected: 4,
-        margin: { top: 12, right: 15, bottom: 12, left: 15 },
-        widthConstraint: { minimum: 140, maximum: 280 },
-        heightConstraint: { minimum: 50 },
+        borderWidthSelected: 3,
+        margin: { top: 10, right: 10, bottom: 10, left: 10 },
+        widthConstraint: { minimum: 120, maximum: 250 },
+        heightConstraint: { minimum: 40 },
         font: {
-          size: 16,
-          face: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
-          bold: {
-            face: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'
-          }
+          size: 14,
+          face: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'
         },
         shape: 'box',
         shadow: {
           enabled: true,
-          color: 'rgba(0,0,0,0.15)',
-          size: 12,
-          x: 2,
-          y: 3
-        },
-        chosen: {
-          node: function(values: any, id: any, selected: any, hovering: any) {
-            if (hovering) {
-              values.borderWidth = 3;
-              values.shadow = true;
-              values.shadowSize = 16;
-            }
-          },
-          label: false
+          color: 'rgba(0,0,0,0.1)',
+          size: 10,
+          x: 0,
+          y: 2
         }
       },
       edges: {
@@ -252,7 +248,7 @@ function App() {
         tooltipDelay: 100,
         zoomView: true,
         dragView: true,
-        navigationButtons: false,  // Disabled navigation buttons
+        navigationButtons: true,
         keyboard: {
           enabled: false  // Disabled to prevent conflicts with search
         }
@@ -275,23 +271,19 @@ function App() {
       document.body.style.cursor = 'default';
     });
 
-    // Wait for stabilization then fit the entire graph in view
-    networkInstance.current.on("stabilizationIterationsDone", function () {
-      setTimeout(() => {
-        if (networkInstance.current) {
-          // Fit the entire network in the viewport
-          networkInstance.current.fit({
-            animation: {
-              duration: 1000,
-              easingFunction: 'easeInOutQuad'
-            }
-          });
-        }
-      }, 100);
-    });
-
-    // Trigger stabilization
-    networkInstance.current.stabilize();
+    // Center on the target node with animation
+    setTimeout(() => {
+      const targetNode = data.nodes.find(n => n.level === 0);
+      if (targetNode && networkInstance.current) {
+        networkInstance.current.focus(targetNode.id, {
+          scale: 1,
+          animation: {
+            duration: 1000,
+            easingFunction: 'easeInOutQuad'
+          }
+        });
+      }
+    }, 100);
   };
 
   // Filter variables based on search
@@ -303,23 +295,12 @@ function App() {
     : variables;
 
   return (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'row', 
-      height: '100vh',
-      width: '100vw',
-      backgroundColor: PolicyEngineTheme.colors.BLUE_98,
-      overflow: 'hidden'
-    }}>
+    <div className="h-screen flex" style={{ backgroundColor: PolicyEngineTheme.colors.BLUE_98 }}>
       {/* Modern Sidebar */}
-      <div style={{ 
+      <div className="overflow-y-auto flex-shrink-0 shadow-xl" style={{ 
         width: '380px',
-        flexShrink: 0,
         backgroundColor: PolicyEngineTheme.colors.WHITE,
-        borderRight: `2px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-        boxShadow: '4px 0 12px rgba(0,0,0,0.05)',
-        overflowY: 'auto',
-        height: '100vh'
+        borderRight: `2px solid ${PolicyEngineTheme.colors.BLUE_95}`
       }}>
         <div className="p-5">
           {/* Header with gradient */}
@@ -329,13 +310,18 @@ function App() {
             borderRadius: '12px',
             boxShadow: '0 4px 16px rgba(44, 100, 150, 0.3)'
           }}>
-            <div>
-              <h1 className="text-xl font-bold text-white">
-                PolicyEngine Flowchart
-              </h1>
-              <p className="text-xs mt-1" style={{ color: PolicyEngineTheme.colors.BLUE_98, opacity: 0.95 }}>
-                Visualize variable dependencies
-              </p>
+            <div className="flex items-center gap-3">
+              <div style={{ color: PolicyEngineTheme.colors.WHITE }}>
+                <GraphIcon />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white">
+                  PolicyEngine Flowchart
+                </h1>
+                <p className="text-xs mt-1" style={{ color: PolicyEngineTheme.colors.BLUE_98, opacity: 0.95 }}>
+                  Visualize variable dependencies
+                </p>
+              </div>
             </div>
           </div>
 
@@ -380,7 +366,7 @@ function App() {
               <div className="absolute z-10 w-full mt-2 bg-white rounded-lg shadow-xl max-h-64 overflow-y-auto" style={{
                 border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`
               }}>
-                {filteredVariables.slice(0, 5).map(v => (
+                {filteredVariables.slice(0, 10).map(v => (
                   <div
                     key={v.name}
                     className="px-4 py-3 cursor-pointer transition-all text-sm"
@@ -400,6 +386,11 @@ function App() {
                     <div className="font-mono font-semibold" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
                       {v.name}
                     </div>
+                    {v.label && (
+                      <div className="text-xs mt-1" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
+                        {v.label}
+                      </div>
+                    )}
                   </div>
                 ))}
                 {filteredVariables.length === 0 && (
@@ -630,7 +621,10 @@ function App() {
                 <span>Generating...</span>
               </>
             ) : (
-              <span>Generate Flowchart</span>
+              <>
+                <GraphIcon />
+                <span>Generate Flowchart</span>
+              </>
             )}
           </button>
 
@@ -648,6 +642,70 @@ function App() {
             </div>
           )}
 
+          {/* Legend Section */}
+          {graphData && (
+            <div className="mt-5 p-4 rounded-lg" style={{
+              backgroundColor: PolicyEngineTheme.colors.BLUE_98,
+              border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`
+            }}>
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+                <span>📊</span> Legend
+              </h3>
+              
+              <div className="space-y-3">
+                {/* Node Types */}
+                <div className="text-xs">
+                  <div className="font-medium mb-2" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
+                    Node Types:
+                  </div>
+                  <div className="space-y-1 ml-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded" style={{ 
+                        backgroundColor: PolicyEngineTheme.colors.TEAL_ACCENT,
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                      }}></div>
+                      <span>Target Variable</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded" style={{ 
+                        backgroundColor: PolicyEngineTheme.colors.BLUE_LIGHT,
+                        border: `2px solid ${PolicyEngineTheme.colors.BLUE_PRIMARY}`
+                      }}></div>
+                      <span>Regular Variable</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded" style={{ 
+                        backgroundColor: PolicyEngineTheme.colors.BLUE_98,
+                        border: `2px solid ${PolicyEngineTheme.colors.DARK_RED}`
+                      }}></div>
+                      <span>Stop Variable</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Edge Types */}
+                <div className="text-xs">
+                  <div className="font-medium mb-2" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
+                    Arrow Types:
+                  </div>
+                  <div className="space-y-1 ml-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-1" style={{ backgroundColor: PolicyEngineTheme.colors.GRAY }}></div>
+                      <span>Dependency</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-1" style={{ backgroundColor: PolicyEngineTheme.colors.GREEN }}></div>
+                      <span>Addition (+)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-1" style={{ backgroundColor: PolicyEngineTheme.colors.DARK_RED }}></div>
+                      <span>Subtraction (-)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Graph Stats with better design */}
           {graphData && (
@@ -656,7 +714,7 @@ function App() {
               border: `1px solid ${PolicyEngineTheme.colors.TEAL_ACCENT}`
             }}>
               <div className="text-xs font-semibold mb-3" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                Graph Statistics
+                📈 Graph Statistics
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="p-3 rounded text-center" style={{
@@ -680,115 +738,16 @@ function App() {
               </div>
             </div>
           )}
-
-          {/* Legend Section */}
-          {graphData && (
-            <div className="mt-4 p-4 rounded-lg" style={{
-              backgroundColor: PolicyEngineTheme.colors.WHITE,
-              border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-            }}>
-              <h3 className="text-sm font-semibold mb-3" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                Legend
-              </h3>
-              
-              <div className="space-y-3">
-                {/* Node Types */}
-                <div>
-                  <p className="text-xs font-medium mb-2" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
-                    Nodes
-                  </p>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 p-1 rounded" style={{ 
-                      backgroundColor: `${PolicyEngineTheme.colors.TEAL_ACCENT}10`
-                    }}>
-                      <div className="w-4 h-4 rounded" style={{ 
-                        backgroundColor: PolicyEngineTheme.colors.TEAL_ACCENT,
-                        border: `2px solid ${PolicyEngineTheme.colors.TEAL_PRESSED}`,
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                      }}></div>
-                      <span className="text-xs font-medium" style={{ color: PolicyEngineTheme.colors.TEAL_PRESSED }}>Root Variable</span>
-                    </div>
-                    <div className="flex items-center gap-2 p-1 rounded" style={{ 
-                      backgroundColor: `${PolicyEngineTheme.colors.BLUE_PRIMARY}10`
-                    }}>
-                      <div className="w-4 h-4 rounded" style={{ 
-                        backgroundColor: PolicyEngineTheme.colors.BLUE_LIGHT,
-                        border: `2px solid ${PolicyEngineTheme.colors.BLUE_PRIMARY}`,
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                      }}></div>
-                      <span className="text-xs font-medium" style={{ color: PolicyEngineTheme.colors.BLUE_PRIMARY }}>Dependencies</span>
-                    </div>
-                    <div className="flex items-center gap-2 p-1 rounded" style={{ 
-                      backgroundColor: `${PolicyEngineTheme.colors.DARK_RED}10`
-                    }}>
-                      <div className="w-4 h-4 rounded" style={{ 
-                        backgroundColor: '#FFE5E5',
-                        border: `2px solid ${PolicyEngineTheme.colors.DARK_RED}`,
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                      }}></div>
-                      <span className="text-xs font-medium" style={{ color: PolicyEngineTheme.colors.DARK_RED }}>Stop Variables</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Edge Types */}
-                <div>
-                  <p className="text-xs font-medium mb-2" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
-                    Edges
-                  </p>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 p-1 rounded" style={{ 
-                      backgroundColor: `${PolicyEngineTheme.colors.GREEN}10`
-                    }}>
-                      <div className="flex items-center justify-center w-4 h-4">
-                        <span style={{ color: PolicyEngineTheme.colors.GREEN, fontWeight: 'bold', fontSize: '16px' }}>+</span>
-                      </div>
-                      <span className="text-xs font-medium" style={{ color: PolicyEngineTheme.colors.GREEN }}>Addition</span>
-                    </div>
-                    <div className="flex items-center gap-2 p-1 rounded" style={{ 
-                      backgroundColor: `${PolicyEngineTheme.colors.DARK_RED}10`
-                    }}>
-                      <div className="flex items-center justify-center w-4 h-4">
-                        <span style={{ color: PolicyEngineTheme.colors.DARK_RED, fontWeight: 'bold', fontSize: '16px' }}>−</span>
-                      </div>
-                      <span className="text-xs font-medium" style={{ color: PolicyEngineTheme.colors.DARK_RED }}>Subtraction</span>
-                    </div>
-                    <div className="flex items-center gap-2 p-1 rounded" style={{ 
-                      backgroundColor: `${PolicyEngineTheme.colors.GRAY}10`
-                    }}>
-                      <div className="w-4 h-1" style={{ backgroundColor: PolicyEngineTheme.colors.GRAY }}></div>
-                      <span className="text-xs font-medium" style={{ color: PolicyEngineTheme.colors.GRAY }}>Reference</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
       {/* Graph Container with better styling */}
-      <div style={{ 
-        flex: 1,
-        padding: '24px',
-        minWidth: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100vh',
-        overflow: 'hidden',
-        position: 'relative'
-      }}>
-        <div ref={networkContainer} style={{
-          width: '100%',
-          height: '100%',
+      <div className="flex-1 p-6">
+        <div ref={networkContainer} className="w-full h-full rounded-xl" style={{
           backgroundColor: PolicyEngineTheme.colors.WHITE,
           boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
-          border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-          borderRadius: '12px',
-          flex: 1
+          border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`
         }}></div>
-        
       </div>
 
     </div>
