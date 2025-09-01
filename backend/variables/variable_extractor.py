@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""
+Variable extraction module for PolicyEngine variables.
+Handles loading and parsing of variable definitions from Python files.
+"""
+
+import ast
+from pathlib import Path
+from typing import Dict, List, Set, Optional, Any
+
+
+class VariableExtractor:
+    """Extracts PolicyEngine variables from source files."""
+    
+    def __init__(self, base_path: str = "policyengine-us/policyengine_us/variables"):
+        self.base_path = Path(base_path)
+    
+    def load_all_variables(self) -> Dict[str, Dict]:
+        """Load all variables from PolicyEngine source files."""
+        variables = {}
+        
+        if not self.base_path.exists():
+            print(f"Path not found: {self.base_path}")
+            return variables
+        
+        # Recursively find all Python files
+        python_files = list(self.base_path.rglob("*.py"))
+        
+        for file_path in python_files:
+            if "__pycache__" in str(file_path):
+                continue
+            
+            variable_name = file_path.stem
+            variable_data = self._extract_from_file(file_path, variable_name)
+            
+            if variable_data:
+                variables[variable_name] = variable_data
+        
+        return variables
+    
+    def _extract_from_file(self, file_path: Path, variable_name: str) -> Optional[Dict]:
+        """Extract variable metadata from a single file."""
+        try:
+            with open(file_path, 'r') as f:
+                content = f.read()
+            
+            tree = ast.parse(content)
+            
+            # Find the variable class definition
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef) and node.name == variable_name:
+                    return self._extract_metadata(node, content, file_path)
+        
+        except Exception as e:
+            # Skip files that can't be parsed
+            pass
+        
+        return None
+    
+    def _extract_metadata(self, class_node: ast.ClassDef, file_content: str, file_path: Path) -> Dict:
+        """Extract metadata from a variable class definition."""
+        metadata = {
+            'file_path': str(file_path),
+            'parameters': {},
+            'variables': [],
+            'adds': [],
+            'subtracts': [],
+            'defined_for': []
+        }
+        
+        # Extract attributes from class body
+        for node in class_node.body:
+            if isinstance(node, ast.Assign):
+                self._extract_assignments(node, metadata)
+            elif isinstance(node, ast.FunctionDef) and node.name == 'formula':
+                metadata['variables'] = self._extract_formula_variables(node)
+                metadata['parameters'] = self._extract_formula_parameters(node)
+        
+        return metadata
+    
+    def _extract_assignments(self, node: ast.Assign, metadata: Dict) -> None:
+        """Extract simple assignments from class body."""
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                attr_name = target.id
+                
+                # Extract string values
+                if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                    if attr_name == 'label':
+                        metadata['label'] = node.value.value
+                    elif attr_name == 'documentation':
+                        metadata['description'] = node.value.value
+                    elif attr_name == 'unit':
+                        metadata['unit'] = node.value.value
+                    elif attr_name == 'definition_period':
+                        metadata['definition_period'] = node.value.value
+                
+                # Extract list values
+                elif isinstance(node.value, ast.List):
+                    items = []
+                    for elt in node.value.elts:
+                        if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                            items.append(elt.value)
+                    
+                    if attr_name == 'adds':
+                        metadata['adds'] = items
+                    elif attr_name == 'subtracts':
+                        metadata['subtracts'] = items
+                    elif attr_name == 'defined_for':
+                        metadata['defined_for'] = items
+    
+    def _extract_formula_variables(self, formula_node: ast.FunctionDef) -> List[str]:
+        """Extract variable references from formula method."""
+        variables = []
+        
+        for node in ast.walk(formula_node):
+            if isinstance(node, ast.Call):
+                # Handle entity calls: person('variable_name', ...)
+                if (isinstance(node.func, ast.Name) and 
+                    node.func.id in ['person', 'tax_unit', 'household', 'family', 'spm_unit', 'marital_unit']):
+                    if node.args and isinstance(node.args[0], ast.Constant):
+                        variables.append(node.args[0].value)
+                
+                # Handle .variable() method calls
+                elif (isinstance(node.func, ast.Attribute) and 
+                      node.func.attr in ['variable', 'get_variable']):
+                    if node.args and isinstance(node.args[0], ast.Constant):
+                        variables.append(node.args[0].value)
+                
+                # Handle add() function: add(entity, period, ["var1", "var2"])
+                elif isinstance(node.func, ast.Name) and node.func.id == 'add':
+                    if len(node.args) >= 3:
+                        # Handle list of variables
+                        if isinstance(node.args[2], ast.List):
+                            for elt in node.args[2].elts:
+                                if isinstance(elt, ast.Constant):
+                                    variables.append(elt.value)
+                        # Handle single variable as string
+                        elif isinstance(node.args[2], ast.Constant):
+                            variables.append(node.args[2].value)
+                
+                # Handle select() with variable references
+                elif isinstance(node.func, ast.Name) and node.func.id in ['select', 'where']:
+                    # These often contain variable references in their conditions
+                    pass
+        
+        return list(set(variables))  # Remove duplicates
+    
+    def _extract_formula_parameters(self, formula_node: ast.FunctionDef) -> Dict[str, str]:
+        """Extract parameter references from formula method."""
+        parameters = {}
+        
+        for node in ast.walk(formula_node):
+            if isinstance(node, ast.Call):
+                # Handle .parameter() method calls
+                if (isinstance(node.func, ast.Attribute) and 
+                    node.func.attr in ['parameter', 'get_parameter']):
+                    if node.args and isinstance(node.args[0], ast.Constant):
+                        param_path = node.args[0].value
+                        param_name = param_path.split('.')[-1]
+                        parameters[param_name] = param_path
+                
+                # Handle parameters(period) calls
+                elif isinstance(node.func, ast.Name) and node.func.id == 'parameters':
+                    # This typically returns a parameter node
+                    # We need to trace the attribute chain after it
+                    pass
+        
+        return parameters
