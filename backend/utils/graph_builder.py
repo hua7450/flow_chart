@@ -97,6 +97,33 @@ class GraphBuilder:
                                 'type': 'subtracts'
                             })
                             add_dependencies(sub_var, level + 1)
+                
+                # Add parameter nodes if enabled
+                if show_parameters and var_name not in no_params_list:
+                    parameters = var_data.get('parameters', {})
+                    for param_name, param_path in parameters.items():
+                        param_node_id = f"param_{var_name}_{param_name}"
+                        
+                        # Add parameter node
+                        if param_node_id not in nodes:
+                            # Try to load parameter details
+                            param_details = None
+                            if self.param_handler:
+                                param_details = self.param_handler.load_parameter(param_path)
+                            
+                            nodes[param_node_id] = {
+                                'level': level + 1,
+                                'type': 'parameter',
+                                'title': param_path,
+                                'data': param_details or {}
+                            }
+                        
+                        # Add edge from parameter to variable
+                        edges.append({
+                            'from': param_node_id,
+                            'to': var_name,
+                            'type': 'parameter'
+                        })
         
         # Start building from the target variable
         add_dependencies(start_variable, 0)
@@ -134,6 +161,16 @@ class GraphBuilder:
                     'highlight': {
                         'background': '#ffebeb',
                         'border': '#b50d0d'
+                    }
+                }
+            elif node_type == 'parameter':
+                # Parameter node - Yellow/Orange theme
+                color = {
+                    'background': '#FFF3CD',  # Light yellow
+                    'border': '#FFA500',      # Orange
+                    'highlight': {
+                        'background': '#FFE5B4',
+                        'border': '#FF8C00'
                     }
                 }
             else:

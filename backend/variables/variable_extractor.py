@@ -270,7 +270,20 @@ class VariableExtractor:
     def _extract_formula_parameters(self, formula_node: ast.FunctionDef) -> Dict[str, str]:
         """Extract parameter references from formula method."""
         parameters = {}
+        param_var_assignments = {}  # Track parameter variable assignments like p = parameters(...)
         
+        # First pass: identify parameter variable assignments
+        for node in ast.walk(formula_node):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        # Look for assignments like: p = parameters(period).gov.states.il.dceo.liheap.eligibility
+                        if isinstance(node.value, ast.Attribute):
+                            param_path = self._extract_parameter_path(node.value)
+                            if param_path:
+                                param_var_assignments[target.id] = param_path
+        
+        # Second pass: find actual parameter usage (e.g., p.rent_rate)
         for node in ast.walk(formula_node):
             if isinstance(node, ast.Call):
                 # Handle .parameter() method calls
@@ -280,11 +293,35 @@ class VariableExtractor:
                         param_path = node.args[0].value
                         param_name = param_path.split('.')[-1]
                         parameters[param_name] = param_path
-                
-                # Handle parameters(period) calls
-                elif isinstance(node.func, ast.Name) and node.func.id == 'parameters':
-                    # This typically returns a parameter node
-                    # We need to trace the attribute chain after it
-                    pass
+            
+            elif isinstance(node, ast.Attribute):
+                # Check if this is a parameter usage like p.rent_rate
+                if (isinstance(node.value, ast.Name) and 
+                    node.value.id in param_var_assignments):
+                    base_path = param_var_assignments[node.value.id]
+                    full_param_path = f"{base_path}.{node.attr}"
+                    param_name = node.attr  # Use the actual parameter name
+                    parameters[param_name] = full_param_path
         
         return parameters
+    
+    def _extract_parameter_path(self, node: ast.Attribute) -> str:
+        """Extract parameter path from attribute chain starting with parameters(period)."""
+        path_parts = []
+        current = node
+        
+        # Walk up the attribute chain
+        while isinstance(current, ast.Attribute):
+            path_parts.append(current.attr)
+            current = current.value
+        
+        # Check if this chain starts with parameters(period)
+        if isinstance(current, ast.Call):
+            if (isinstance(current.func, ast.Name) and 
+                current.func.id == 'parameters' and 
+                len(current.args) >= 1):
+                # This is a parameters(period) call, reverse the path and join
+                path_parts.reverse()
+                return '.'.join(path_parts) if path_parts else ''
+        
+        return ''
