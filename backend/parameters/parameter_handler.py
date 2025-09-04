@@ -16,8 +16,8 @@ class ParameterHandler:
     def __init__(self, base_paths: list = None):
         if base_paths is None:
             base_paths = [
-                Path("policyengine-us/policyengine_us/parameters"),
-                Path("policyengine-us/policyengine_us/data/parameters")
+                Path("../policyengine-us/policyengine_us/parameters"),
+                Path("../policyengine-us/policyengine_us/data/parameters")
             ]
         self.base_paths = base_paths
     

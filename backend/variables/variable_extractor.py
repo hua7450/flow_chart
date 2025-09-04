@@ -12,7 +12,7 @@ from typing import Dict, List, Set, Optional, Any
 class VariableExtractor:
     """Extracts PolicyEngine variables from source files."""
     
-    def __init__(self, base_path: str = "policyengine-us/policyengine_us/variables"):
+    def __init__(self, base_path: str = "../policyengine-us/policyengine_us/variables"):
         self.base_path = Path(base_path)
     
     def load_all_variables(self) -> Dict[str, Dict]:
