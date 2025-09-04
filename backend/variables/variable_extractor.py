@@ -108,6 +108,15 @@ class VariableExtractor:
                         metadata['subtracts'] = items
                     elif attr_name == 'defined_for':
                         metadata['defined_for'] = items
+                
+                # Handle list comprehensions (e.g., ["social_security_" + i for i in [...]])
+                elif isinstance(node.value, ast.ListComp):
+                    items = self._evaluate_list_comprehension(node.value)
+                    if items:
+                        if attr_name == 'adds':
+                            metadata['adds'] = items
+                        elif attr_name == 'subtracts':
+                            metadata['subtracts'] = items
     
     def _extract_formula_variables(self, formula_node: ast.FunctionDef) -> List[str]:
         """Extract variable references from formula method."""
@@ -145,6 +154,32 @@ class VariableExtractor:
                     pass
         
         return list(set(variables))  # Remove duplicates
+    
+    def _evaluate_list_comprehension(self, node: ast.ListComp) -> List[str]:
+        """Evaluate simple list comprehensions to extract string values."""
+        try:
+            # Handle simple case: ["prefix_" + i for i in ["a", "b", "c"]]
+            if (isinstance(node.elt, ast.BinOp) and 
+                isinstance(node.elt.op, ast.Add) and
+                len(node.generators) == 1):
+                
+                generator = node.generators[0]
+                # Check if iterating over a list of strings
+                if isinstance(generator.iter, ast.List):
+                    items = []
+                    for elt in generator.iter.elts:
+                        if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                            # Evaluate the expression for each item
+                            if isinstance(node.elt.left, ast.Constant):
+                                prefix = node.elt.left.value
+                                items.append(prefix + elt.value)
+                            elif isinstance(node.elt.right, ast.Constant):
+                                suffix = node.elt.right.value
+                                items.append(elt.value + suffix)
+                    return items
+        except:
+            pass
+        return []
     
     def _extract_formula_parameters(self, formula_node: ast.FunctionDef) -> Dict[str, str]:
         """Extract parameter references from formula method."""
