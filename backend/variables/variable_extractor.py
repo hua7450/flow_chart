@@ -122,6 +122,28 @@ class VariableExtractor:
         """Extract variable references from formula method."""
         variables = []
         
+        # First pass: collect all constant list assignments and list comprehensions
+        list_vars = {}
+        for node in ast.walk(formula_node):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        # Handle list comprehensions
+                        if isinstance(node.value, ast.ListComp):
+                            # Try to resolve the list comprehension
+                            comp_result = self._evaluate_list_comprehension_with_context(node.value, formula_node)
+                            if comp_result:
+                                list_vars[target.id] = comp_result
+                        # Handle constant lists
+                        elif isinstance(node.value, ast.List):
+                            items = []
+                            for elt in node.value.elts:
+                                if isinstance(elt, ast.Constant):
+                                    items.append(elt.value)
+                            if items:
+                                list_vars[target.id] = items
+        
+        # Second pass: extract variable references
         for node in ast.walk(formula_node):
             if isinstance(node, ast.Call):
                 # Handle entity calls: person('variable_name', ...)
@@ -147,6 +169,11 @@ class VariableExtractor:
                         # Handle single variable as string
                         elif isinstance(node.args[2], ast.Constant):
                             variables.append(node.args[2].value)
+                        # Handle variable name that references a list
+                        elif isinstance(node.args[2], ast.Name):
+                            var_name = node.args[2].id
+                            if var_name in list_vars:
+                                variables.extend(list_vars[var_name])
                 
                 # Handle select() with variable references
                 elif isinstance(node.func, ast.Name) and node.func.id in ['select', 'where']:
@@ -154,6 +181,42 @@ class VariableExtractor:
                     pass
         
         return list(set(variables))  # Remove duplicates
+    
+    def _evaluate_list_comprehension_with_context(self, node: ast.ListComp, formula_node: ast.FunctionDef) -> List[str]:
+        """Evaluate list comprehensions with access to formula context."""
+        # First try the regular evaluation
+        result = self._evaluate_list_comprehension(node)
+        if result:
+            return result
+        
+        # If that fails, try to resolve variable references in the comprehension
+        if len(node.generators) == 1:
+            generator = node.generators[0]
+            
+            # Look for the iterator variable in the formula's assignments
+            if isinstance(generator.iter, ast.Name):
+                iter_var_name = generator.iter.id
+                # Find the assignment in the formula
+                for stmt in formula_node.body:
+                    if isinstance(stmt, ast.Assign):
+                        for target in stmt.targets:
+                            if isinstance(target, ast.Name) and target.id == iter_var_name:
+                                if isinstance(stmt.value, ast.List):
+                                    # Found the list definition, now evaluate the comprehension
+                                    items = []
+                                    for elt in stmt.value.elts:
+                                        if isinstance(elt, ast.Constant):
+                                            # Apply the comprehension expression
+                                            if isinstance(node.elt, ast.BinOp) and isinstance(node.elt.op, ast.Add):
+                                                # Handle i.lower() + "_suffix" pattern
+                                                if isinstance(node.elt.left, ast.Call):
+                                                    if (isinstance(node.elt.left.func, ast.Attribute) and
+                                                        node.elt.left.func.attr == 'lower' and
+                                                        isinstance(node.elt.right, ast.Constant)):
+                                                        suffix = node.elt.right.value
+                                                        items.append(elt.value.lower() + suffix)
+                                    return items
+        return []
     
     def _evaluate_list_comprehension(self, node: ast.ListComp) -> List[str]:
         """Evaluate simple list comprehensions to extract string values."""
@@ -176,6 +239,29 @@ class VariableExtractor:
                             elif isinstance(node.elt.right, ast.Constant):
                                 suffix = node.elt.right.value
                                 items.append(elt.value + suffix)
+                    return items
+                # Check if iterating over a variable (e.g., STATES_WITH_CHILD_CARE_SUBSIDIES)
+                elif isinstance(generator.iter, ast.Name):
+                    # For now, we can't resolve variable references, but we could enhance this
+                    # to look for the variable definition in the same function
+                    pass
+            
+            # Handle case: [i.lower() + "_suffix" for i in ["CA", "CO", "NE"]]
+            elif (len(node.generators) == 1):
+                generator = node.generators[0]
+                if isinstance(generator.iter, ast.List):
+                    items = []
+                    for elt in generator.iter.elts:
+                        if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                            # Handle method calls like i.lower()
+                            if isinstance(node.elt, ast.BinOp) and isinstance(node.elt.op, ast.Add):
+                                if isinstance(node.elt.left, ast.Call):
+                                    # e.g., i.lower() + "_suffix"
+                                    if (isinstance(node.elt.left.func, ast.Attribute) and
+                                        node.elt.left.func.attr == 'lower' and
+                                        isinstance(node.elt.right, ast.Constant)):
+                                        suffix = node.elt.right.value
+                                        items.append(elt.value.lower() + suffix)
                     return items
         except:
             pass
