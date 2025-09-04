@@ -187,11 +187,7 @@ class GraphBuilder:
                     'align': 'center'
                 },
                 'borderWidth': 2,
-                'borderWidthSelected': 3,
-                'widthConstraint': {
-                    'minimum': 140,
-                    'maximum': 280
-                }
+                'borderWidthSelected': 3
             })
         
         # Format edges

@@ -189,12 +189,12 @@ function App() {
           enabled: true,
           direction: 'UD',
           sortMethod: 'directed',
-          nodeSpacing: 200,
+          nodeSpacing: 450,
           levelSeparation: 150,
-          treeSpacing: 250,
+          treeSpacing: 450,
           blockShifting: true,
           edgeMinimization: true,
-          parentCentralization: true
+          parentCentralization: false
         }
       },
       autoResize: true,
@@ -204,11 +204,11 @@ function App() {
       nodes: {
         borderWidth: 2,
         borderWidthSelected: 4,
-        margin: { top: 12, right: 15, bottom: 12, left: 15 },
-        widthConstraint: { minimum: 140, maximum: 280 },
-        heightConstraint: { minimum: 50 },
+        margin: { top: 10, right: 10, bottom: 10, left: 10 },
+        widthConstraint: false,
+        heightConstraint: { minimum: 40 },
         font: {
-          size: 16,
+          size: 14,
           face: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
           bold: {
             face: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'
