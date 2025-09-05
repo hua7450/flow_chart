@@ -190,12 +190,12 @@ function App() {
           enabled: true,
           direction: 'UD',
           sortMethod: 'directed',
-          nodeSpacing: 450,
+          nodeSpacing: 300,
           levelSeparation: 150,
-          treeSpacing: 450,
-          blockShifting: true,
+          treeSpacing: 200,
+          blockShifting: false,
           edgeMinimization: true,
-          parentCentralization: false
+          parentCentralization: true
         }
       },
       autoResize: true,
@@ -205,8 +205,8 @@ function App() {
       nodes: {
         borderWidth: 2,
         borderWidthSelected: 4,
-        margin: { top: 10, right: 10, bottom: 10, left: 10 },
-        widthConstraint: false,
+        margin: { top: 10, right: 15, bottom: 10, left: 15 },
+        widthConstraint: { maximum: 250 },
         heightConstraint: { minimum: 40 },
         font: {
           size: 14,
@@ -266,6 +266,48 @@ function App() {
       { nodes: data.nodes, edges: data.edges },
       options
     );
+
+    // After initial render, fix overlapping by ensuring proper spacing
+    setTimeout(() => {
+      if (!networkInstance.current) return;
+      
+      const positions = networkInstance.current.getPositions();
+      if (!positions) return;
+      
+      // Group nodes by their Y position (level)
+      const levels: Map<number, string[]> = new Map();
+      
+      for (const nodeId in positions) {
+        const y = Math.round(positions[nodeId].y / 10) * 10; // Round to nearest 10 for grouping
+        if (!levels.has(y)) {
+          levels.set(y, []);
+        }
+        levels.get(y)!.push(nodeId);
+      }
+      
+      // For each level, ensure proper spacing
+      const minSpacing = 180; // Minimum horizontal spacing
+      
+      levels.forEach((nodesAtLevel) => {
+        if (nodesAtLevel.length <= 1) return;
+        
+        // Sort nodes by current X position
+        nodesAtLevel.sort((a, b) => positions[a].x - positions[b].x);
+        
+        // Calculate total width needed
+        const totalWidth = (nodesAtLevel.length - 1) * minSpacing;
+        const startX = -totalWidth / 2;
+        
+        // Position nodes with equal spacing
+        nodesAtLevel.forEach((nodeId, index) => {
+          const newX = startX + (index * minSpacing);
+          networkInstance.current?.moveNode(nodeId, newX, positions[nodeId].y);
+        });
+      });
+      
+      // Fit the view to show all nodes (without animation to avoid zoom issues)
+      networkInstance.current.fit();
+    }, 100);
 
     // Add hover effects
     networkInstance.current.on("hoverNode", function () {
@@ -747,6 +789,16 @@ function App() {
                           flexShrink: 0
                         }}></div>
                         <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Stop</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div style={{ 
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '50%',
+                          backgroundColor: '#8B4B9B',
+                          flexShrink: 0
+                        }}></div>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Defined For</span>
                       </div>
                     </div>
                   </div>

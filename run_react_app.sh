@@ -2,8 +2,9 @@
 
 # Start Flask API in background
 echo "Starting Flask API server on port 5001..."
-python3 api.py &
+cd backend && python3 api.py &
 API_PID=$!
+cd ..
 
 # Wait for API to start
 sleep 2

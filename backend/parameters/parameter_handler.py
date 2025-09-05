@@ -35,6 +35,22 @@ class ParameterHandler:
                         return yaml.safe_load(f)
                 except Exception as e:
                     print(f"Error loading {yaml_path}: {e}")
+            else:
+                # Try treating the last part as a nested key
+                # e.g., gov.usda.school_meals.income.limit.REDUCED
+                # where REDUCED is a key in limit.yaml
+                if len(path_parts) > 1:
+                    parent_yaml_path = base_path / Path(*path_parts[:-2]) / f"{path_parts[-2]}.yaml"
+                    if parent_yaml_path.exists():
+                        try:
+                            with open(parent_yaml_path, 'r') as f:
+                                parent_data = yaml.safe_load(f)
+                                # Look for the nested key
+                                nested_key = path_parts[-1]
+                                if nested_key in parent_data:
+                                    return parent_data[nested_key]
+                        except Exception as e:
+                            print(f"Error loading nested parameter from {parent_yaml_path}: {e}")
         
         return None
     

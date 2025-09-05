@@ -5,7 +5,8 @@ Creates network graphs from variable dependencies.
 """
 
 from typing import Dict, List, Set, Optional, Any
-from backend.parameters.parameter_handler import ParameterHandler
+from parameters.parameter_handler import ParameterHandler
+from utils.parameter_formatter import format_parameter_value, detect_parameter_structure
 
 
 class GraphBuilder:
@@ -47,17 +48,33 @@ class GraphBuilder:
             if var_name not in nodes:
                 var_data = variables.get(var_name, {})
                 
+                # Check if this is a defined_for dependency
+                # It's defined_for if it's in the 'defined_for' field of the parent variable
+                is_defined_for = False
+                for node_name, node_data in nodes.items():
+                    if 'data' in node_data:
+                        defined_for_vars = node_data['data'].get('defined_for', [])
+                        if isinstance(defined_for_vars, str):
+                            defined_for_vars = [defined_for_vars]
+                        if var_name in defined_for_vars:
+                            is_defined_for = True
+                            break
+                
                 # Build title/tooltip - show only label if available, otherwise show variable name
                 if 'label' in var_data:
                     tooltip_text = var_data['label']
                 else:
                     tooltip_text = var_name
                 
+                node_type = 'stop' if is_stop else ('defined_for' if is_defined_for else 'variable')
+                
                 nodes[var_name] = {
-                    'level': level,
-                    'type': 'stop' if is_stop else 'variable',
+                    'level': level + (1 if is_defined_for else 0),  # Push defined_for variables down one level
+                    'type': node_type,
                     'title': tooltip_text,
-                    'data': var_data
+                    'data': var_data,
+                    'param_info': [],  # Will be populated later if parameters are enabled
+                    'enum_options': var_data.get('enum_options', [])  # Store enum options if available
                 }
             
             # Don't expand stop variables
@@ -67,6 +84,23 @@ class GraphBuilder:
             # Add dependencies
             if var_name in variables:
                 var_data = variables[var_name]
+                
+                # Add defined_for dependencies (these are special - the variable depends on them)
+                defined_for = var_data.get('defined_for', [])
+                if defined_for:
+                    # Normalize to list if it's a string
+                    if isinstance(defined_for, str):
+                        defined_for = [defined_for]
+                    
+                    for defined_for_var in defined_for:
+                        if defined_for_var != var_name:  # Avoid self-references
+                            # For defined_for, the current variable depends on the defined_for variable
+                            edges.append({
+                                'from': defined_for_var,
+                                'to': var_name,
+                                'type': 'defined_for'
+                            })
+                            add_dependencies(defined_for_var, level + 1)
                 
                 # Add regular variable dependencies
                 for dep_var in var_data.get('variables', []):
@@ -79,51 +113,58 @@ class GraphBuilder:
                         add_dependencies(dep_var, level + 1)
                 
                 # Add adds/subtracts if enabled
+                # BUT: If these come from a parameter list, don't add them as graph dependencies
                 if expand_adds_subtracts:
-                    for add_var in var_data.get('adds', []):
-                        if add_var != var_name:
-                            edges.append({
-                                'from': add_var,
-                                'to': var_name,
-                                'type': 'adds'
-                            })
-                            add_dependencies(add_var, level + 1)
+                    # Check if adds comes from a parameter
+                    if 'adds_from_parameter' not in var_data:
+                        # Regular adds - show in graph
+                        for add_var in var_data.get('adds', []):
+                            if add_var != var_name:
+                                edges.append({
+                                    'from': add_var,
+                                    'to': var_name,
+                                    'type': 'adds'
+                                })
+                                add_dependencies(add_var, level + 1)
+                    # If it's from a parameter, it will be shown in the tooltip instead
                     
-                    for sub_var in var_data.get('subtracts', []):
-                        if sub_var != var_name:
-                            edges.append({
-                                'from': sub_var,
-                                'to': var_name,
-                                'type': 'subtracts'
-                            })
-                            add_dependencies(sub_var, level + 1)
+                    # Check if subtracts comes from a parameter
+                    if 'subtracts_from_parameter' not in var_data:
+                        # Regular subtracts - show in graph
+                        for sub_var in var_data.get('subtracts', []):
+                            if sub_var != var_name:
+                                edges.append({
+                                    'from': sub_var,
+                                    'to': var_name,
+                                    'type': 'subtracts'
+                                })
+                                add_dependencies(sub_var, level + 1)
+                    # If it's from a parameter, it will be shown in the tooltip instead
                 
-                # Add parameter nodes if enabled
+                # Load parameter values if enabled (but don't create separate nodes)
                 if show_parameters and var_name not in no_params_list:
                     parameters = var_data.get('parameters', {})
+                    param_info = []
+                    if var_name == 'dc_liheap_payment':
+                        print(f"DEBUG: dc_liheap_payment parameters = {parameters}")
                     for param_name, param_path in parameters.items():
-                        param_node_id = f"param_{var_name}_{param_name}"
-                        
-                        # Add parameter node
-                        if param_node_id not in nodes:
-                            # Try to load parameter details
-                            param_details = None
-                            if self.param_handler:
-                                param_details = self.param_handler.load_parameter(param_path)
-                            
-                            nodes[param_node_id] = {
-                                'level': level + 1,
-                                'type': 'parameter',
-                                'title': param_path,
-                                'data': param_details or {}
-                            }
-                        
-                        # Add edge from parameter to variable
-                        edges.append({
-                            'from': param_node_id,
-                            'to': var_name,
-                            'type': 'parameter'
-                        })
+                        # Try to load parameter details
+                        if self.param_handler:
+                            param_details = self.param_handler.load_parameter(param_path)
+                            if param_details:
+                                # Get the parameter label from metadata
+                                param_label = param_details.get('metadata', {}).get('label', param_name)
+                                # Use the formatter to get the value
+                                formatted_value = format_parameter_value(param_details, param_name, param_detail_level)
+                                if formatted_value:
+                                    param_info.append({
+                                        'label': param_label,
+                                        'value': formatted_value
+                                    })
+                    
+                    # Add parameter info to the node data
+                    if param_info:
+                        nodes[var_name]['param_info'] = param_info
         
         # Start building from the target variable
         add_dependencies(start_variable, 0)
@@ -173,6 +214,16 @@ class GraphBuilder:
                         'border': '#FF8C00'
                     }
                 }
+            elif node_type == 'defined_for':
+                # Defined_for node - Purple theme
+                color = {
+                    'background': '#E6D5F7',  # Light purple
+                    'border': '#8B4B9B',      # Purple
+                    'highlight': {
+                        'background': '#F3EBFB',
+                        'border': '#6B3B7B'
+                    }
+                }
             else:
                 # Normal node - Blue theme
                 color = {
@@ -186,7 +237,7 @@ class GraphBuilder:
             
             # Format label for better display (wrap long names)
             label = node_id if show_labels else ''
-            if len(label) > 30:
+            if len(label) > 40:
                 # Insert line breaks for very long variable names
                 words = label.split('_')
                 formatted_label = []
@@ -194,7 +245,7 @@ class GraphBuilder:
                 current_length = 0
                 
                 for word in words:
-                    if current_length + len(word) > 25:
+                    if current_length + len(word) > 35:
                         if current_line:
                             formatted_label.append('_'.join(current_line))
                             current_line = [word]
@@ -208,10 +259,90 @@ class GraphBuilder:
                 
                 label = '\n'.join(formatted_label)
             
+            # Build enhanced tooltip with parameter values and full metadata
+            tooltip = node_data.get('title', node_id)
+            
+            # Add information about parameter-based lists
+            var_data = node_data.get('data', {})
+            if 'adds_from_parameter' in var_data:
+                tooltip += f'\n\nADDS FROM PARAMETER: {var_data["adds_from_parameter"]}'
+                adds_list = var_data.get('adds', [])
+                if adds_list:
+                    tooltip += '\nEXPANDS TO:'
+                    for var in adds_list:
+                        tooltip += f'\n• {var}'
+            
+            if 'subtracts_from_parameter' in var_data:
+                tooltip += f'\n\nSUBTRACTS FROM PARAMETER: {var_data["subtracts_from_parameter"]}'
+                subtracts_list = var_data.get('subtracts', [])
+                if subtracts_list:
+                    tooltip += '\nEXPANDS TO:'
+                    for var in subtracts_list:
+                        tooltip += f'\n• {var}'
+            
+            # Add parameter values from adds/subtracts
+            if 'adds_parameter_values' in var_data:
+                tooltip += '\n\nADDS (PARAMETER VALUES):'
+                for param_path, value in var_data['adds_parameter_values'].items():
+                    tooltip += f'\n• {param_path.split(".")[-1]}: {value}'
+            
+            if 'subtracts_parameter_values' in var_data:
+                tooltip += '\n\nSUBTRACTS (PARAMETER VALUES):'
+                for param_path, value in var_data['subtracts_parameter_values'].items():
+                    tooltip += f'\n• {param_path.split(".")[-1]}: {value}'
+            
+            # Add enum options if available
+            enum_options = node_data.get('enum_options', [])
+            if enum_options:
+                tooltip += '\n\nPOSSIBLE VALUES:'
+                for option in enum_options:
+                    # Show only the descriptive value, not the key
+                    tooltip += f'\n• {option["value"]}'
+            
+            # Add direct parameter info if available
+            direct_params = var_data.get('direct_parameters', {})
+            if direct_params:
+                tooltip += '\n\nDIRECT PARAMETERS:'
+                for param_name, param_path in direct_params.items():
+                    tooltip += f'\n• {param_name}: {param_path}'
+                    # Add the parameter value if available
+                    param_details = var_data.get('parameter_details', {}).get(param_name, {})
+                    if 'value' in param_details:
+                        tooltip += f' = {param_details["value"]}'
+            
+            # Add bracket parameter info if available
+            bracket_params = var_data.get('bracket_parameters', {})
+            if bracket_params:
+                tooltip += '\n\nBRACKET PARAMETERS:'
+                for param_name, param_path in bracket_params.items():
+                    tooltip += f'\n• {param_name}: {param_path}'
+                    # Add bracket details if available
+                    param_details = var_data.get('parameter_details', {}).get(param_name, {})
+                    if 'brackets' in param_details:
+                        tooltip += '\n  Age Thresholds:'
+                        for bracket in param_details['brackets']:
+                            threshold = bracket.get('threshold', 'N/A')
+                            amount = bracket.get('amount', 'N/A')
+                            if amount is True:
+                                amount = 'Eligible'
+                            elif amount is False:
+                                amount = 'Not Eligible'
+                            tooltip += f'\n  - Age {threshold}: {amount}'
+                    if 'description' in param_details:
+                        tooltip += f'\n  Description: {param_details["description"]}'
+            
+            # Add parameter info if available (regular parameters)
+            param_info = node_data.get('param_info', [])
+            if param_info:
+                tooltip += '\n\nPARAMETERS:'
+                for param in param_info:
+                    # Show parameter label and formatted value
+                    tooltip += f'\n• {param["label"]}: {param["value"]}'
+            
             nodes.append({
                 'id': node_id,
                 'label': label,
-                'title': node_data.get('title', node_id),
+                'title': tooltip,
                 'level': node_data['level'],
                 'color': color,
                 'shape': 'box',
