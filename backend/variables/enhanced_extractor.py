@@ -126,7 +126,7 @@ class EnhancedVariableExtractor:
         # Import the parameter handler
         import sys
         sys.path.append(str(Path(__file__).parent.parent))
-        from backend.parameters.parameter_handler import ParameterHandler
+        from parameters.parameter_handler import ParameterHandler
         self.param_handler = ParameterHandler()
     
     def extract_enhanced_metadata(self, file_path: Path, variable_name: str) -> Dict:
