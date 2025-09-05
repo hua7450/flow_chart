@@ -10,8 +10,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
 parts/
 sdist/
 var/
@@ -23,8 +21,25 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# PolicyEngine symlinks (local setup, not for repo)
-policyengine_*
+# Virtual Environment
+env/
+venv/
+ENV/
+VENV/
+.venv
+
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# React build output
+frontend/build/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
 
 # IDE files
 .vscode/
@@ -42,11 +57,32 @@ policyengine_*
 ehthumbs.db
 Thumbs.db
 
-# Streamlit
-.streamlit/
-
 # Temporary files
 *.tmp
 *.temp
 temp/
 tmp/
+
+# Log files
+*.log
+logs/
+
+# Environment variables
+.env
+.env.*
+
+# Backend specific
+backend/*.db
+backend/instance/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+coverage.xml
+*.hypothesis/
+
+# Backup files
+*.bak
+*.backup

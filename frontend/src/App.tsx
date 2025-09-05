@@ -79,6 +79,7 @@ function App() {
   const [paramDetailLevel, setParamDetailLevel] = useState<string>('Summary');
   const [stopVariables, setStopVariables] = useState<string>('');
   const [noParamsList, setNoParamsList] = useState<string>('');
+  const [legendExpanded, setLegendExpanded] = useState<boolean>(true);
   
   const networkContainer = useRef<HTMLDivElement>(null);
   const networkInstance = useRef<Network | null>(null);
@@ -189,12 +190,12 @@ function App() {
           enabled: true,
           direction: 'UD',
           sortMethod: 'directed',
-          nodeSpacing: 450,
+          nodeSpacing: 300,
           levelSeparation: 150,
-          treeSpacing: 450,
-          blockShifting: true,
+          treeSpacing: 200,
+          blockShifting: false,
           edgeMinimization: true,
-          parentCentralization: false
+          parentCentralization: true
         }
       },
       autoResize: true,
@@ -204,8 +205,8 @@ function App() {
       nodes: {
         borderWidth: 2,
         borderWidthSelected: 4,
-        margin: { top: 10, right: 10, bottom: 10, left: 10 },
-        widthConstraint: false,
+        margin: { top: 10, right: 15, bottom: 10, left: 15 },
+        widthConstraint: { maximum: 250 },
         heightConstraint: { minimum: 40 },
         font: {
           size: 14,
@@ -266,6 +267,48 @@ function App() {
       options
     );
 
+    // After initial render, fix overlapping by ensuring proper spacing
+    setTimeout(() => {
+      if (!networkInstance.current) return;
+      
+      const positions = networkInstance.current.getPositions();
+      if (!positions) return;
+      
+      // Group nodes by their Y position (level)
+      const levels: Map<number, string[]> = new Map();
+      
+      for (const nodeId in positions) {
+        const y = Math.round(positions[nodeId].y / 10) * 10; // Round to nearest 10 for grouping
+        if (!levels.has(y)) {
+          levels.set(y, []);
+        }
+        levels.get(y)!.push(nodeId);
+      }
+      
+      // For each level, ensure proper spacing
+      const minSpacing = 180; // Minimum horizontal spacing
+      
+      levels.forEach((nodesAtLevel) => {
+        if (nodesAtLevel.length <= 1) return;
+        
+        // Sort nodes by current X position
+        nodesAtLevel.sort((a, b) => positions[a].x - positions[b].x);
+        
+        // Calculate total width needed
+        const totalWidth = (nodesAtLevel.length - 1) * minSpacing;
+        const startX = -totalWidth / 2;
+        
+        // Position nodes with equal spacing
+        nodesAtLevel.forEach((nodeId, index) => {
+          const newX = startX + (index * minSpacing);
+          networkInstance.current?.moveNode(nodeId, newX, positions[nodeId].y);
+        });
+      });
+      
+      // Fit the view to show all nodes (without animation to avoid zoom issues)
+      networkInstance.current.fit();
+    }, 100);
+
     // Add hover effects
     networkInstance.current.on("hoverNode", function () {
       document.body.style.cursor = 'pointer';
@@ -319,9 +362,10 @@ function App() {
         borderRight: `2px solid ${PolicyEngineTheme.colors.BLUE_95}`,
         boxShadow: '4px 0 12px rgba(0,0,0,0.05)',
         overflowY: 'auto',
-        height: '100vh'
+        height: '100vh',
+        marginLeft: '16px'
       }}>
-        <div className="p-5">
+        <div style={{ padding: '20px 24px' }}>
           {/* Header with gradient */}
           <div className="mb-6" style={{
             padding: '24px',
@@ -688,81 +732,108 @@ function App() {
               border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
               boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
             }}>
-              <h3 className="text-sm font-semibold mb-3" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+              <h3 
+                className="text-sm font-semibold cursor-pointer flex items-center gap-1"
+                onClick={() => setLegendExpanded(!legendExpanded)}
+                style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE, userSelect: 'none', margin: 0 }}
+              >
                 Legend
+                <svg
+                  className={`inline-block transition-transform duration-200 ${legendExpanded ? 'rotate-180' : ''}`}
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={PolicyEngineTheme.colors.DARK_GRAY}
+                  strokeWidth="2"
+                  style={{ marginLeft: '2px' }}
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
               </h3>
               
-              <div className="space-y-3">
-                {/* Node Types */}
-                <div>
-                  <p className="text-xs font-medium mb-2" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
-                    Nodes
-                  </p>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 p-1 rounded" style={{ 
-                      backgroundColor: `${PolicyEngineTheme.colors.TEAL_ACCENT}10`
-                    }}>
-                      <div className="w-4 h-4 rounded" style={{ 
-                        backgroundColor: PolicyEngineTheme.colors.TEAL_ACCENT,
-                        border: `2px solid ${PolicyEngineTheme.colors.TEAL_PRESSED}`,
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                      }}></div>
-                      <span className="text-xs font-medium" style={{ color: PolicyEngineTheme.colors.TEAL_PRESSED }}>Root Variable</span>
-                    </div>
-                    <div className="flex items-center gap-2 p-1 rounded" style={{ 
-                      backgroundColor: `${PolicyEngineTheme.colors.BLUE_PRIMARY}10`
-                    }}>
-                      <div className="w-4 h-4 rounded" style={{ 
-                        backgroundColor: PolicyEngineTheme.colors.BLUE_LIGHT,
-                        border: `2px solid ${PolicyEngineTheme.colors.BLUE_PRIMARY}`,
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                      }}></div>
-                      <span className="text-xs font-medium" style={{ color: PolicyEngineTheme.colors.BLUE_PRIMARY }}>Dependencies</span>
-                    </div>
-                    <div className="flex items-center gap-2 p-1 rounded" style={{ 
-                      backgroundColor: `${PolicyEngineTheme.colors.DARK_RED}10`
-                    }}>
-                      <div className="w-4 h-4 rounded" style={{ 
-                        backgroundColor: '#FFE5E5',
-                        border: `2px solid ${PolicyEngineTheme.colors.DARK_RED}`,
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                      }}></div>
-                      <span className="text-xs font-medium" style={{ color: PolicyEngineTheme.colors.DARK_RED }}>Stop Variables</span>
+              {legendExpanded && (
+                <div className="mt-3 space-y-0">
+                  {/* Node Types */}
+                  <div>
+                    <p className="text-xs font-semibold mb-2" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+                      Nodes
+                    </p>
+                    <div className="space-y-2" style={{ paddingLeft: '12px' }}>
+                      <div className="flex items-center gap-3">
+                        <div style={{ 
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '50%',
+                          backgroundColor: PolicyEngineTheme.colors.TEAL_ACCENT,
+                          flexShrink: 0
+                        }}></div>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Root</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div style={{ 
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '50%',
+                          backgroundColor: PolicyEngineTheme.colors.BLUE_PRIMARY,
+                          flexShrink: 0
+                        }}></div>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Dependency</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div style={{ 
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '50%',
+                          backgroundColor: PolicyEngineTheme.colors.DARK_RED,
+                          flexShrink: 0
+                        }}></div>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Stop</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div style={{ 
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '50%',
+                          backgroundColor: '#8B4B9B',
+                          flexShrink: 0
+                        }}></div>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Defined For</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Edge Types */}
-                <div>
-                  <p className="text-xs font-medium mb-2" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
-                    Edges
-                  </p>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 p-1 rounded" style={{ 
-                      backgroundColor: `${PolicyEngineTheme.colors.GREEN}10`
-                    }}>
-                      <div className="flex items-center justify-center w-4 h-4">
-                        <span style={{ color: PolicyEngineTheme.colors.GREEN, fontWeight: 'bold', fontSize: '16px' }}>+</span>
+                  {/* Divider */}
+                  <div style={{ 
+                    borderTop: `1px dashed ${PolicyEngineTheme.colors.BLUE_95}`,
+                    marginTop: '6px',
+                    marginBottom: '6px'
+                  }}></div>
+
+                  {/* Edge Types */}
+                  <div>
+                    <p className="text-xs font-semibold mb-2" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+                      Edges
+                    </p>
+                    <div className="space-y-2" style={{ paddingLeft: '12px' }}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold" style={{ color: PolicyEngineTheme.colors.GREEN, minWidth: '65px' }}>+ (green)</span>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Addition</span>
                       </div>
-                      <span className="text-xs font-medium" style={{ color: PolicyEngineTheme.colors.GREEN }}>Addition</span>
-                    </div>
-                    <div className="flex items-center gap-2 p-1 rounded" style={{ 
-                      backgroundColor: `${PolicyEngineTheme.colors.DARK_RED}10`
-                    }}>
-                      <div className="flex items-center justify-center w-4 h-4">
-                        <span style={{ color: PolicyEngineTheme.colors.DARK_RED, fontWeight: 'bold', fontSize: '16px' }}>−</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold" style={{ color: PolicyEngineTheme.colors.DARK_RED, minWidth: '65px' }}>- (red)</span>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Subtraction</span>
                       </div>
-                      <span className="text-xs font-medium" style={{ color: PolicyEngineTheme.colors.DARK_RED }}>Subtraction</span>
-                    </div>
-                    <div className="flex items-center gap-2 p-1 rounded" style={{ 
-                      backgroundColor: `${PolicyEngineTheme.colors.GRAY}10`
-                    }}>
-                      <div className="w-4 h-1" style={{ backgroundColor: PolicyEngineTheme.colors.GRAY }}></div>
-                      <span className="text-xs font-medium" style={{ color: PolicyEngineTheme.colors.GRAY }}>Reference</span>
+                      <div className="flex items-center gap-2">
+                        <div style={{ minWidth: '65px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <div className="w-8 h-0.5" style={{ backgroundColor: PolicyEngineTheme.colors.GRAY }}></div>
+                        </div>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Reference</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>

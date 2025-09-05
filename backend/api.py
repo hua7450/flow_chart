@@ -14,6 +14,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from backend.variables.variable_extractor import VariableExtractor
+from backend.variables.enhanced_extractor import EnhancedVariableExtractor
 from backend.parameters.parameter_handler import ParameterHandler
 from backend.utils.graph_builder import GraphBuilder
 from stop_variables_config import DEFAULT_STOP_VARIABLES
@@ -23,6 +24,7 @@ CORS(app)  # Enable CORS for React frontend
 
 # Initialize handlers
 variable_extractor = VariableExtractor()
+enhanced_extractor = EnhancedVariableExtractor()
 parameter_handler = ParameterHandler()
 graph_builder = GraphBuilder(parameter_handler)
 
@@ -30,6 +32,38 @@ graph_builder = GraphBuilder(parameter_handler)
 print("Loading variables from PolicyEngine source...")
 VARIABLES_CACHE = variable_extractor.load_all_variables()
 print(f"Loaded {len(VARIABLES_CACHE)} variables")
+
+# Enhance specific variables with bracket parameter information
+print("Enhancing variables with bracket parameters...")
+from pathlib import Path
+enhanced_count = 0
+for var_name, var_data in VARIABLES_CACHE.items():
+    # Check if this variable has parameters
+    if 'parameters' in var_data and var_data['parameters']:
+        file_path = var_data.get('file_path')
+        if file_path:
+            try:
+                enhanced_metadata = enhanced_extractor.extract_enhanced_metadata(Path(file_path), var_name)
+                if enhanced_metadata:
+                    # Merge the enhanced metadata
+                    if enhanced_metadata.get('bracket_parameters'):
+                        var_data['bracket_parameters'] = enhanced_metadata['bracket_parameters']
+                        enhanced_count += 1
+                    if enhanced_metadata.get('parameter_details'):
+                        var_data['parameter_details'] = enhanced_metadata['parameter_details']
+                    if enhanced_metadata.get('direct_parameters'):
+                        var_data['direct_parameters'] = enhanced_metadata['direct_parameters']
+            except Exception as e:
+                # Skip variables that fail enhancement
+                pass
+
+print(f"Enhanced {enhanced_count} variables with bracket parameters")
+
+# Debug dc_liheap_payment
+if 'dc_liheap_payment' in VARIABLES_CACHE:
+    dc_meta = VARIABLES_CACHE['dc_liheap_payment']
+    print(f"DEBUG dc_liheap_payment parameters: {dc_meta.get('parameters', {})}")
+    print(f"DEBUG dc_liheap_payment variables: {dc_meta.get('variables', [])}")
 
 
 @app.route('/api/variables', methods=['GET'])

@@ -21,7 +21,9 @@ DEFAULT_STOP_VARIABLES = [
     'is_full_time_student',
     'tax_unit_married',
     'filing_status',
-    'immigration_status'
+    'immigration_status',
+    'employment_income',
+    'self_employment_income',  
 ]
 
 # Additional stop variables that are available but not pre-checked
