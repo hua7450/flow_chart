@@ -56,8 +56,17 @@ class ParameterHandler:
     
     def format_value(self, param_data: Dict, param_name: str, 
                     detail_level: str = "Summary", 
-                    param_date: Optional[str] = None) -> str:
+                    context_variable: str = None) -> str:
         """Format parameter value for display."""
+        # Import the comprehensive formatter from parameter_formatter module
+        from backend.utils.parameter_formatter import format_parameter_value
+        
+        # Use the comprehensive formatter that handles all structures
+        formatted = format_parameter_value(param_data, param_name, detail_level, context_variable)
+        if formatted:
+            return formatted
+        
+        # Fallback to simple formatting for basic values
         if 'values' in param_data:
             values = param_data['values']
             

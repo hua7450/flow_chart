@@ -453,6 +453,14 @@ class VariableExtractor:
                                 parameters[target.id] = param_path
                                 # Also track it as a parameter variable for potential sub-attribute access
                                 param_var_assignments[target.id] = param_path
+                        elif isinstance(node.value, ast.Subscript):
+                            # Handle subscripted parameters like parameters(period).gov.hhs.smi.amount[state]
+                            if isinstance(node.value.value, ast.Attribute):
+                                param_path = self._extract_parameter_path(node.value.value)
+                                if param_path:
+                                    # Extract the parameter name from the path
+                                    param_name = param_path.split('.')[-1]
+                                    parameters[param_name] = param_path
         
         # Second pass: find actual parameter usage (e.g., p.rent_rate)
         for node in ast.walk(formula_node):

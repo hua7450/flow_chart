@@ -146,15 +146,25 @@ class GraphBuilder:
                     param_info = []
                     if var_name == 'dc_liheap_payment':
                         print(f"DEBUG: dc_liheap_payment parameters = {parameters}")
+                    
+                    # Special case for hhs_smi: skip redundant sub-parameters
+                    params_to_skip = set()
+                    if var_name == 'hhs_smi':
+                        # These are already shown in the household_size_adjustments parameter
+                        params_to_skip = {'first_person', 'second_to_sixth_person', 'additional_person'}
+                    
                     for param_name, param_path in parameters.items():
+                        if param_name in params_to_skip:
+                            continue  # Skip redundant parameters
                         # Try to load parameter details
                         if self.param_handler:
                             param_details = self.param_handler.load_parameter(param_path)
                             if param_details:
                                 # Get the parameter label from metadata
                                 param_label = param_details.get('metadata', {}).get('label', param_name)
-                                # Use the parameter handler to get the formatted value
-                                formatted_value = self.param_handler.format_value(param_details, param_name, param_detail_level)
+                                # Use the parameter handler to get the formatted value, passing root variable as context
+                                # This ensures state-specific parameters show the correct state value
+                                formatted_value = self.param_handler.format_value(param_details, param_name, param_detail_level, start_variable)
                                 if formatted_value:
                                     param_info.append({
                                         'label': param_label,
