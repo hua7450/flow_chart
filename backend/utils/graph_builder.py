@@ -6,7 +6,6 @@ Creates network graphs from variable dependencies.
 
 from typing import Dict, List, Set, Optional, Any
 from parameters.parameter_handler import ParameterHandler
-from utils.parameter_formatter import format_parameter_value, detect_parameter_structure
 
 
 class GraphBuilder:
@@ -154,8 +153,8 @@ class GraphBuilder:
                             if param_details:
                                 # Get the parameter label from metadata
                                 param_label = param_details.get('metadata', {}).get('label', param_name)
-                                # Use the formatter to get the value
-                                formatted_value = format_parameter_value(param_details, param_name, param_detail_level)
+                                # Use the parameter handler to get the formatted value
+                                formatted_value = self.param_handler.format_value(param_details, param_name, param_detail_level)
                                 if formatted_value:
                                     param_info.append({
                                         'label': param_label,
@@ -319,7 +318,7 @@ class GraphBuilder:
                     # Add bracket details if available
                     param_details = var_data.get('parameter_details', {}).get(param_name, {})
                     if 'brackets' in param_details:
-                        tooltip += '\n  Age Thresholds:'
+                        tooltip += '\n  Bracket Thresholds:'
                         for bracket in param_details['brackets']:
                             threshold = bracket.get('threshold', 'N/A')
                             amount = bracket.get('amount', 'N/A')
@@ -327,7 +326,7 @@ class GraphBuilder:
                                 amount = 'Eligible'
                             elif amount is False:
                                 amount = 'Not Eligible'
-                            tooltip += f'\n  - Age {threshold}: {amount}'
+                            tooltip += f'\n  - Threshold {threshold}: {amount}'
                     if 'description' in param_details:
                         tooltip += f'\n  Description: {param_details["description"]}'
             

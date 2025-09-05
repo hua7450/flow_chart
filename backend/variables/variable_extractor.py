@@ -448,16 +448,11 @@ class VariableExtractor:
                             # Extract the parameter path
                             param_path = self._extract_parameter_path(node.value)
                             if param_path:
-                                # Check if this looks like a partial path (for p = parameters(period).gov...)
-                                # or a complete path (for limit = parameters(period).gov...REDUCED)
-                                # Complete paths usually end with an uppercase word or specific value
-                                path_parts = param_path.split('.')
-                                if path_parts and path_parts[-1].isupper():
-                                    # This is a direct parameter assignment like limit = parameters(period).gov...REDUCED
-                                    parameters[target.id] = param_path
-                                else:
-                                    # This is a parameter variable assignment like p = parameters(period).gov...
-                                    param_var_assignments[target.id] = param_path
+                                # Any assignment of parameters(period).xxx is a parameter
+                                # Store it as a direct parameter assignment
+                                parameters[target.id] = param_path
+                                # Also track it as a parameter variable for potential sub-attribute access
+                                param_var_assignments[target.id] = param_path
         
         # Second pass: find actual parameter usage (e.g., p.rent_rate)
         for node in ast.walk(formula_node):

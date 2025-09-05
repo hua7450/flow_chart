@@ -172,7 +172,7 @@ function App() {
         borderWidth: 2,
         borderWidthSelected: 4,
         margin: { top: 10, right: 10, bottom: 10, left: 10 },
-        widthConstraint: { minimum: 120, maximum: 250 },
+        widthConstraint: { maximum: 250 },
         heightConstraint: { minimum: 40 },
         font: {
           size: 14,

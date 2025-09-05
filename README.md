@@ -2,6 +2,24 @@
 
 An interactive web application that generates dependency flowcharts for PolicyEngine variables. Simply type a variable name and instantly visualize its dependencies as an interactive network graph.
 
+## 🚀 Quick Start
+
+```bash
+# Clone and setup
+git clone https://github.com/hua7450/flow_chart.git
+cd flow_chart
+git submodule update --init --recursive
+
+# Install dependencies
+cd backend && pip install -r requirements.txt && cd ..
+cd frontend && npm install && cd ..
+
+# Run the application
+./run_react_app.sh
+```
+
+Then open http://localhost:3000 in your browser.
+
 ## Features
 
 - 🔍 **Interactive Visualization**: Explore variable dependencies with an interactive network graph
@@ -11,54 +29,37 @@ An interactive web application that generates dependency flowcharts for PolicyEn
 - 🎨 **Color-Coded Interface**: Different colors for different dependency types and node states
 - 📝 **Rich Metadata Display**: View variable labels, descriptions, value types, and parameter values
 
-## Architecture
+## Prerequisites
 
-```
-flow_chart/
-├── backend/           # Flask API server
-│   ├── api.py        # REST API endpoints
-│   ├── variables/    # Variable extraction logic
-│   ├── parameters/   # Parameter handling
-│   └── utils/        # Graph building utilities
-├── frontend/         # React application
-│   ├── src/         
-│   │   ├── components/  # UI components
-│   │   └── App.js      # Main application
-│   └── package.json
-├── docs/             # Documentation
-│   ├── PARAMETER_RULES.md
-│   └── VARIABLE_RULES.md
-└── policyengine-us/  # PolicyEngine source (git submodule)
-```
-
-## Installation
-
-### Prerequisites
-- Python 3.8+
+- Python 3.8 or higher
 - Node.js 14+ and npm
 - Git
 
-### Setup Steps
+## Installation
 
-1. **Clone the repository:**
+### 1. Clone the Repository
+
 ```bash
 git clone https://github.com/hua7450/flow_chart.git
 cd flow_chart
 ```
 
-2. **Initialize the PolicyEngine submodule:**
+### 2. Initialize PolicyEngine Submodule
+
 ```bash
 git submodule update --init --recursive
 ```
 
-3. **Install backend dependencies:**
+### 3. Install Backend Dependencies
+
 ```bash
 cd backend
 pip install -r requirements.txt
 cd ..
 ```
 
-4. **Install frontend dependencies:**
+### 4. Install Frontend Dependencies
+
 ```bash
 cd frontend
 npm install
@@ -67,29 +68,93 @@ cd ..
 
 ## Running the Application
 
-### Quick Start (Both Servers)
+### Option 1: Automated Script (Recommended)
+
 ```bash
 ./run_react_app.sh
 ```
-This will start both the Flask API (port 5001) and React frontend (port 3000).
 
-### Manual Start
+This script will:
+- Start the Flask API server on port 5001
+- Start the React frontend on port 3000
+- Handle proper cleanup when you press Ctrl+C
 
-**Backend API:**
+### Option 2: Manual Start
+
+**Terminal 1 - Backend API:**
 ```bash
 cd backend
 python3 api.py
 ```
-The API will be available at `http://localhost:5001`
 
-**Frontend:**
+**Terminal 2 - Frontend:**
 ```bash
 cd frontend
 npm start
 ```
-The app will open at `http://localhost:3000`
 
-## Using the Application
+## 🛠 Troubleshooting
+
+### Common Issues and Solutions
+
+#### The site can't be reached when accessing localhost:3000
+
+**Problem**: The React app isn't starting properly when using the script.
+
+**Solutions**:
+1. Make sure all dependencies are installed:
+   ```bash
+   cd frontend && npm install
+   ```
+
+2. Check if ports are already in use:
+   ```bash
+   lsof -i :3000 -i :5001
+   ```
+   If ports are in use, kill the processes:
+   ```bash
+   pkill -f "react-scripts"
+   pkill -f "python3 api.py"
+   ```
+
+3. Try running the services manually in separate terminals (see Option 2 above)
+
+#### API Connection Failed
+
+**Problem**: Frontend can't connect to the backend API.
+
+**Solutions**:
+1. Ensure the backend is running and accessible:
+   ```bash
+   curl http://localhost:5001/api/variables
+   ```
+
+2. Check the frontend `.env` file exists and contains:
+   ```
+   REACT_APP_API_URL=http://localhost:5001
+   ```
+
+#### PolicyEngine Data Not Loading
+
+**Problem**: Variables not loading or showing errors.
+
+**Solution**: Ensure the PolicyEngine submodule is properly initialized:
+```bash
+git submodule update --init --recursive
+```
+
+#### Script Permission Denied
+
+**Problem**: `./run_react_app.sh: Permission denied`
+
+**Solution**: Make the script executable:
+```bash
+chmod +x run_react_app.sh
+```
+
+## 📖 Using the Application
+
+### Basic Usage
 
 1. **Enter a Variable Name**: Type any PolicyEngine variable (e.g., `household_net_income`, `spm_unit_fpg`)
 
@@ -102,21 +167,21 @@ The app will open at `http://localhost:3000`
 
 3. **Generate and Explore**: Click "Generate Flowchart" to create an interactive dependency graph
 
-## Graph Visualization
+### Understanding the Graph
 
-### Node Colors
+#### Node Colors
 - **Teal**: Target variable (your starting point)
 - **Light Blue**: Regular dependency variables
 - **Red Border**: Stop variables (expansion stops here)
 - **Purple**: Variables with `defined_for` conditions
 
-### Edge Types
+#### Edge Types
 - **Gray Arrow**: Standard dependency
 - **Green Arrow**: Addition operation
 - **Red Arrow**: Subtraction operation
 - **Purple Arrow**: Applicability condition (`defined_for`)
 
-### Node Information
+#### Node Information
 Hover over any node to see:
 - Variable label and description
 - Entity type (Person, TaxUnit, Household, etc.)
@@ -125,33 +190,27 @@ Hover over any node to see:
 - Parameters and their values
 - Add/subtract operations
 
-## Advanced Features
+## Project Structure
 
-### Parameter Extraction
-The system automatically extracts and displays:
-- Direct parameter assignments
-- Nested parameter access
-- Bracket parameters with thresholds
-- Subscripted parameters (e.g., state-specific values)
-- Parameter lists that expand to variables
-
-### Stop Variables
-Built-in stop variables prevent infinite recursion:
-- Basic demographics: `age`, `is_child`, `is_adult`
-- Geographic: `state_code`, `county`
-- Income sources: `employment_income`, `self_employment_income`
-- Identifiers: `is_tax_unit_head`, `is_household_head`
-
-## Updating PolicyEngine Data
-
-To get the latest PolicyEngine variables:
-
-```bash
-# Update the submodule
-git submodule update --remote policyengine-us
-git add policyengine-us
-git commit -m "Update PolicyEngine to latest version"
-git push
+```
+flow_chart/
+├── backend/              # Flask API server
+│   ├── api.py           # REST API endpoints
+│   ├── requirements.txt # Python dependencies
+│   ├── variables/       # Variable extraction logic
+│   ├── parameters/      # Parameter handling
+│   └── utils/           # Graph building utilities
+├── frontend/            # React application
+│   ├── src/         
+│   │   ├── components/  # UI components
+│   │   └── App.js      # Main application
+│   ├── package.json     # Node dependencies
+│   └── .env            # Environment variables
+├── docs/                # Documentation
+│   ├── PARAMETER_RULES.md
+│   └── VARIABLE_RULES.md
+├── policyengine-us/     # PolicyEngine source (git submodule)
+└── run_react_app.sh     # Startup script
 ```
 
 ## API Documentation
@@ -173,6 +232,23 @@ GET /api/variable/<variable_name>
 GET /api/graph/<variable_name>?depth=3&expand_adds=true&show_labels=true
 ```
 
+## Advanced Features
+
+### Parameter Extraction
+The system automatically extracts and displays:
+- Direct parameter assignments
+- Nested parameter access
+- Bracket parameters with thresholds
+- Subscripted parameters (e.g., state-specific values)
+- Parameter lists that expand to variables
+
+### Stop Variables
+Built-in stop variables prevent infinite recursion:
+- Basic demographics: `age`, `is_child`, `is_adult`
+- Geographic: `state_code`, `county`
+- Income sources: `employment_income`, `self_employment_income`
+- Identifiers: `is_tax_unit_head`, `is_household_head`
+
 ## Development
 
 ### Backend Development
@@ -187,6 +263,18 @@ The React frontend uses vis-network for graph visualization. To modify:
 cd frontend
 npm start  # Development server with hot reload
 npm run build  # Production build
+```
+
+## Updating PolicyEngine Data
+
+To get the latest PolicyEngine variables:
+
+```bash
+# Update the submodule
+git submodule update --remote policyengine-us
+git add policyengine-us
+git commit -m "Update PolicyEngine to latest version"
+git push
 ```
 
 ## Documentation

@@ -220,7 +220,6 @@ function App() {
         shape: 'box',
         margin: { top: 10, right: 10, bottom: 10, left: 10 },
         widthConstraint: {
-          minimum: 100,
           maximum: 200
         },
         shadow: {
