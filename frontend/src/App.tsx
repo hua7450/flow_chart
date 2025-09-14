@@ -33,7 +33,7 @@ interface GraphData {
   edges: GraphEdge[];
 }
 
-const API_BASE = 'http://localhost:5001/api';
+const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5001/api';
 
 // Icon components
 const SearchIcon = () => (
