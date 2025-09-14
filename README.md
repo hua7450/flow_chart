@@ -2,7 +2,13 @@
 
 An interactive web application that generates dependency flowcharts for PolicyEngine variables. Simply type a variable name and instantly visualize its dependencies as an interactive network graph.
 
-## 🚀 Quick Start
+## 🌐 Live Demo
+
+**No setup required! Try it now: https://hua7450.github.io/flow_chart**
+
+Access the fully functional app directly in your browser - no installation needed.
+
+## 🚀 Quick Start (For Local Development)
 
 ```bash
 # Clone and setup
