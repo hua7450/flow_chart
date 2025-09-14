@@ -1,3 +1,4 @@
 Flask==2.3.3
 Flask-Cors==4.0.0
 PyYAML>=6.0
+policyengine-us>=1.398.0
