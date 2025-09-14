@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "git submodule update --init --recursive && pip install -r requirements.txt"
+buildCommand = "pip install -r requirements.txt"
 
 [deploy]
 startCommand = "cd backend && python api.py"
