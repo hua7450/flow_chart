@@ -22,42 +22,70 @@ from stop_variables_config import DEFAULT_STOP_VARIABLES
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
 
+# Check if we should use cached data (for production/Railway)
+import json
+import os
+
+USE_CACHE = False
+complete_cache_path = Path(__file__).parent / 'complete_data_cache.json'
+
+if complete_cache_path.exists():
+    # We have a complete cache, use it
+    USE_CACHE = True
+    print("Using cached data mode (production)")
+    from backend.parameters.parameter_handler_cached import CachedParameterHandler
+    parameter_handler = CachedParameterHandler(complete_cache_path)
+else:
+    # Use live data (development)
+    print("Using live data mode (development)")
+    parameter_handler = ParameterHandler()
+
 # Initialize handlers
 variable_extractor = VariableExtractor()
 enhanced_extractor = EnhancedVariableExtractor()
-parameter_handler = ParameterHandler()
 graph_builder = GraphBuilder(parameter_handler)
 
 # Cache variables (loaded once at startup)
-print("Loading variables from PolicyEngine source...")
-VARIABLES_CACHE = variable_extractor.load_all_variables()
-print(f"Loaded {len(VARIABLES_CACHE)} variables")
+if USE_CACHE and complete_cache_path.exists():
+    print(f"Loading variables from complete cache...")
+    with open(complete_cache_path, 'r') as f:
+        complete_data = json.load(f)
+        VARIABLES_CACHE = complete_data.get('variables', {})
+    print(f"Loaded {len(VARIABLES_CACHE)} variables from cache")
+else:
+    # Fall back to loading from source (for development)
+    print("Loading variables from PolicyEngine source...")
+    VARIABLES_CACHE = variable_extractor.load_all_variables()
+    print(f"Loaded {len(VARIABLES_CACHE)} variables")
 
-# Enhance specific variables with bracket parameter information
-print("Enhancing variables with bracket parameters...")
-from pathlib import Path
-enhanced_count = 0
-for var_name, var_data in VARIABLES_CACHE.items():
-    # Check if this variable has parameters
-    if 'parameters' in var_data and var_data['parameters']:
-        file_path = var_data.get('file_path')
-        if file_path:
-            try:
-                enhanced_metadata = enhanced_extractor.extract_enhanced_metadata(Path(file_path), var_name)
-                if enhanced_metadata:
-                    # Merge the enhanced metadata
-                    if enhanced_metadata.get('bracket_parameters'):
-                        var_data['bracket_parameters'] = enhanced_metadata['bracket_parameters']
-                        enhanced_count += 1
-                    if enhanced_metadata.get('parameter_details'):
-                        var_data['parameter_details'] = enhanced_metadata['parameter_details']
-                    if enhanced_metadata.get('direct_parameters'):
-                        var_data['direct_parameters'] = enhanced_metadata['direct_parameters']
-            except Exception as e:
-                # Skip variables that fail enhancement
-                pass
-
-print(f"Enhanced {enhanced_count} variables with bracket parameters")
+# Enhance specific variables with bracket parameter information (only in development mode)
+if not USE_CACHE:
+    print("Enhancing variables with bracket parameters...")
+    from pathlib import Path
+    enhanced_count = 0
+    for var_name, var_data in VARIABLES_CACHE.items():
+        # Check if this variable has parameters
+        if 'parameters' in var_data and var_data['parameters']:
+            file_path = var_data.get('file_path')
+            if file_path:
+                try:
+                    enhanced_metadata = enhanced_extractor.extract_enhanced_metadata(Path(file_path), var_name)
+                    if enhanced_metadata:
+                        # Merge the enhanced metadata
+                        if enhanced_metadata.get('bracket_parameters'):
+                            var_data['bracket_parameters'] = enhanced_metadata['bracket_parameters']
+                            enhanced_count += 1
+                        if enhanced_metadata.get('parameter_details'):
+                            var_data['parameter_details'] = enhanced_metadata['parameter_details']
+                        if enhanced_metadata.get('direct_parameters'):
+                            var_data['direct_parameters'] = enhanced_metadata['direct_parameters']
+                except Exception as e:
+                    # Skip variables that fail enhancement
+                    pass
+    
+    print(f"Enhanced {enhanced_count} variables with bracket parameters")
+else:
+    print("Using pre-enhanced variables from cache")
 
 # Debug dc_liheap_payment
 if 'dc_liheap_payment' in VARIABLES_CACHE:
