@@ -1,0 +1,12 @@
+{
+  "files": {
+    "main.css": "/flowchart/static/css/main.7df47bd0.css",
+    "main.js": "/flowchart/static/js/main.56266ef9.js",
+    "static/js/206.ed2f3d44.chunk.js": "/flowchart/static/js/206.ed2f3d44.chunk.js",
+    "index.html": "/flowchart/index.html"
+  },
+  "entrypoints": [
+    "static/css/main.7df47bd0.css",
+    "static/js/main.56266ef9.js"
+  ]
+}
