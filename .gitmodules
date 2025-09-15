@@ -1,3 +1,6 @@
 [submodule "policyengine-us"]
 	path = policyengine-us
 	url = https://github.com/PolicyEngine/policyengine-us.git
+[submodule "policyengine-uk"]
+	path = policyengine-uk
+	url = https://github.com/PolicyEngine/policyengine-uk.git

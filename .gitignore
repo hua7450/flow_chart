@@ -88,4 +88,3 @@ coverage.xml
 *.backup
 
 # PolicyEngine submodules (cloned separately for local development)
-policyengine-uk/

@@ -1,6 +1,6 @@
 # PolicyEngine Variable Dependency Visualizer
 
-An interactive web application that generates dependency flowcharts for PolicyEngine variables. Simply type a variable name and instantly visualize its dependencies as an interactive network graph.
+An interactive web application that generates dependency flowcharts for PolicyEngine variables in both the US and UK. Simply select a country, type a variable name, and instantly visualize its dependencies as an interactive network graph.
 
 ## 🌐 Live Demo
 
@@ -14,6 +14,8 @@ Access the fully functional app directly in your browser - no installation neede
 # Clone and setup
 git clone https://github.com/hua7450/flow_chart.git
 cd flow_chart
+
+# Initialize PolicyEngine submodules for US and UK data
 git submodule update --init --recursive
 
 # Install dependencies
@@ -28,6 +30,7 @@ Then open http://localhost:3000 in your browser.
 
 ## Features
 
+- 🌍 **Multi-Country Support**: Analyze both US (3,000+ variables) and UK (600+ variables) tax-benefit systems
 - 🔍 **Interactive Visualization**: Explore variable dependencies with an interactive network graph
 - 📊 **Comprehensive Dependency Types**: Visualize formulas, additions, subtractions, and parameter dependencies
 - ⚙️ **Highly Customizable**: Control depth, stop variables, and display options
@@ -50,7 +53,7 @@ git clone https://github.com/hua7450/flow_chart.git
 cd flow_chart
 ```
 
-### 2. Initialize PolicyEngine Submodule
+### 2. Initialize PolicyEngine Submodules
 
 ```bash
 git submodule update --init --recursive
@@ -162,16 +165,20 @@ chmod +x run_react_app.sh
 
 ### Basic Usage
 
-1. **Enter a Variable Name**: Type any PolicyEngine variable (e.g., `household_net_income`, `spm_unit_fpg`)
+1. **Select Country**: Choose between United States 🇺🇸 or United Kingdom 🇬🇧 from the dropdown
 
-2. **Configure Options**:
+2. **Enter a Variable Name**: Type any PolicyEngine variable
+   - US examples: `household_net_income`, `earned_income_tax_credit`, `snap`
+   - UK examples: `universal_credit`, `child_benefit`, `nhs_spending`
+
+3. **Configure Options**:
    - **Maximum Depth**: How many levels deep to traverse dependencies (1-10)
    - **Expand Adds/Subtracts**: Show individual variables in add/subtract operations
    - **Show Labels**: Display variable names on nodes
    - **Show Parameters**: Include parameter dependencies
    - **Stop Variables**: Specify variables where traversal should stop
 
-3. **Generate and Explore**: Click "Generate Flowchart" to create an interactive dependency graph
+4. **Generate and Explore**: Click "Generate Flowchart" to create an interactive dependency graph
 
 ### Understanding the Graph
 
@@ -215,7 +222,8 @@ flow_chart/
 ├── docs/                # Documentation
 │   ├── PARAMETER_RULES.md
 │   └── VARIABLE_RULES.md
-├── policyengine-us/     # PolicyEngine source (git submodule)
+├── policyengine-us/     # PolicyEngine US source (git submodule)
+├── policyengine-uk/     # PolicyEngine UK source (git submodule)
 └── run_react_app.sh     # Startup script
 ```
 
@@ -276,9 +284,15 @@ npm run build  # Production build
 To get the latest PolicyEngine variables:
 
 ```bash
-# Update the submodule
+# Update all submodules
+git submodule update --remote
+
+# Or update individually
 git submodule update --remote policyengine-us
-git add policyengine-us
+git submodule update --remote policyengine-uk
+
+# Commit changes
+git add .
 git commit -m "Update PolicyEngine to latest version"
 git push
 ```
