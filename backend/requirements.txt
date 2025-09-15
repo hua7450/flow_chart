@@ -4,7 +4,5 @@ flask-cors>=4.0.0
 pyyaml>=6.0
 requests>=2.31.0
 
-# PolicyEngine packages for both US and UK
-# Note: These require Python <3.13 due to numpy compatibility
-PolicyEngine-US==1.398.0
-PolicyEngine-UK==1.2.0
+# Note: PolicyEngine data is loaded from git clones in Railway
+# See railway.toml for clone commands
