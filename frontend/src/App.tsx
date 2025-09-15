@@ -70,6 +70,8 @@ function App() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [detailsOpen, setDetailsOpen] = useState<boolean>(false);
+  const [selectedCountry, setSelectedCountry] = useState<string>('US');
+  const [variableCount, setVariableCount] = useState<number>(0);
   
   // Controls
   const [maxDepth, setMaxDepth] = useState<number>(10);
@@ -85,10 +87,10 @@ function App() {
   const networkInstance = useRef<Network | null>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
-  // Load variables on mount
+  // Load variables on mount and when country changes
   useEffect(() => {
     loadVariables();
-  }, []);
+  }, [selectedCountry]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -106,9 +108,12 @@ function App() {
 
   const loadVariables = async () => {
     try {
-      const response = await axios.get(`${API_BASE}/variables`);
+      const response = await axios.get(`${API_BASE}/variables`, {
+        params: { country: selectedCountry }
+      });
       if (response.data.success) {
         setVariables(response.data.variables);
+        setVariableCount(response.data.total);
       }
     } catch (err) {
       setError('Failed to load variables');
@@ -124,7 +129,7 @@ function App() {
     
     try {
       const response = await axios.get(`${API_BASE}/search`, {
-        params: { q: query }
+        params: { q: query, country: selectedCountry }
       });
       if (response.data.success) {
         setVariables(response.data.results);
@@ -155,6 +160,7 @@ function App() {
     try {
       const response = await axios.post(`${API_BASE}/graph`, {
         variable: selectedVariable,
+        country: selectedCountry,
         maxDepth,
         expandAddsSubtracts,
         showParameters,
@@ -341,7 +347,7 @@ function App() {
   const filteredVariables = searchTerm.length >= 2
     ? variables.filter(v => 
         v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        v.label.toLowerCase().includes(searchTerm.toLowerCase())
+        (v.label || '').toLowerCase().includes(searchTerm.toLowerCase())
       )
     : variables;
 
@@ -380,6 +386,31 @@ function App() {
               <p className="text-xs mt-1" style={{ color: PolicyEngineTheme.colors.BLUE_98, opacity: 0.95 }}>
                 Visualize variable dependencies
               </p>
+              
+              {/* Country Selector */}
+              <div className="mt-3">
+                <select 
+                  value={selectedCountry}
+                  onChange={(e) => {
+                    setSelectedCountry(e.target.value);
+                    setSelectedVariable('');
+                    setSearchTerm('');
+                    setError('');
+                    setGraphData(null);
+                  }}
+                  className="px-3 py-1 text-sm rounded-md"
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    color: PolicyEngineTheme.colors.DARKEST_BLUE,
+                    border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="US">🇺🇸 United States ({variableCount > 0 ? variableCount.toLocaleString() : '...'} variables)</option>
+                  <option value="UK">🇬🇧 United Kingdom ({selectedCountry === 'UK' && variableCount > 0 ? variableCount.toLocaleString() : '670'} variables)</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -465,7 +496,7 @@ function App() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-xs font-medium mb-1" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
-                    Selected Variable
+                    Selected Variable ({selectedCountry})
                   </div>
                   <div className="font-mono text-sm font-bold" style={{ color: PolicyEngineTheme.colors.TEAL_PRESSED }}>
                     {selectedVariable}

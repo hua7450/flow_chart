@@ -15,6 +15,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from backend.variables.variable_extractor import VariableExtractor
 from backend.variables.enhanced_extractor import EnhancedVariableExtractor
+from backend.variables.uk_variable_extractor import UKVariableExtractor
 from backend.parameters.parameter_handler import ParameterHandler
 from backend.utils.graph_builder import GraphBuilder
 from stop_variables_config import DEFAULT_STOP_VARIABLES
@@ -22,16 +23,24 @@ from stop_variables_config import DEFAULT_STOP_VARIABLES
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React frontend
 
-# Initialize handlers
+# Initialize handlers for both US and UK
 variable_extractor = VariableExtractor()
 enhanced_extractor = EnhancedVariableExtractor()
+uk_variable_extractor = UKVariableExtractor()
 parameter_handler = ParameterHandler()
 graph_builder = GraphBuilder(parameter_handler)
 
-# Cache variables (loaded once at startup)
-print("Loading variables from PolicyEngine source...")
-VARIABLES_CACHE = variable_extractor.load_all_variables()
-print(f"Loaded {len(VARIABLES_CACHE)} variables")
+# Cache variables for both countries (loaded once at startup)
+print("Loading US variables from PolicyEngine source...")
+US_VARIABLES_CACHE = variable_extractor.load_all_variables()
+print(f"Loaded {len(US_VARIABLES_CACHE)} US variables")
+
+print("Loading UK variables from PolicyEngine-UK package...")
+UK_VARIABLES_CACHE = uk_variable_extractor.load_all_variables()
+print(f"Loaded {len(UK_VARIABLES_CACHE)} UK variables")
+
+# Keep VARIABLES_CACHE as US for backward compatibility
+VARIABLES_CACHE = US_VARIABLES_CACHE
 
 # Enhance specific variables with bracket parameter information
 print("Enhancing variables with bracket parameters...")
@@ -70,8 +79,17 @@ if 'dc_liheap_payment' in VARIABLES_CACHE:
 def get_variables():
     """Get list of all available variables."""
     try:
+        # Get country parameter (default to US for backward compatibility)
+        country = request.args.get('country', 'US').upper()
+        
+        # Select appropriate cache
+        if country == 'UK':
+            cache = UK_VARIABLES_CACHE
+        else:
+            cache = US_VARIABLES_CACHE
+        
         variable_list = []
-        for name, data in VARIABLES_CACHE.items():
+        for name, data in cache.items():
             variable_list.append({
                 'name': name,
                 'label': data.get('label', name),
@@ -81,7 +99,8 @@ def get_variables():
         return jsonify({
             'success': True,
             'variables': variable_list,
-            'total': len(variable_list)
+            'total': len(variable_list),
+            'country': country
         })
     except Exception as e:
         return jsonify({
@@ -94,13 +113,22 @@ def get_variables():
 def get_variable_details(variable_name):
     """Get detailed information about a specific variable."""
     try:
-        if variable_name not in VARIABLES_CACHE:
+        # Get country parameter
+        country = request.args.get('country', 'US').upper()
+        
+        # Select appropriate cache
+        if country == 'UK':
+            cache = UK_VARIABLES_CACHE
+        else:
+            cache = US_VARIABLES_CACHE
+        
+        if variable_name not in cache:
             return jsonify({
                 'success': False,
-                'error': f'Variable {variable_name} not found'
+                'error': f'Variable {variable_name} not found in {country} data'
             }), 404
         
-        var_data = VARIABLES_CACHE[variable_name]
+        var_data = cache[variable_name]
         
         # Load parameter values if they exist
         parameters = {}
@@ -142,11 +170,18 @@ def generate_graph():
     try:
         data = request.json
         variable_name = data.get('variable')
+        country = data.get('country', 'US').upper()
         
-        if variable_name not in VARIABLES_CACHE:
+        # Select appropriate cache
+        if country == 'UK':
+            cache = UK_VARIABLES_CACHE
+        else:
+            cache = US_VARIABLES_CACHE
+        
+        if variable_name not in cache:
             return jsonify({
                 'success': False,
-                'error': f'Variable {variable_name} not found'
+                'error': f'Variable {variable_name} not found in {country} data'
             }), 404
         
         # Build parameters
@@ -161,7 +196,7 @@ def generate_graph():
         
         # Build the dependency graph
         graph_data = graph_builder.build_graph(
-            VARIABLES_CACHE,
+            cache,
             variable_name,
             max_depth=max_depth,
             stop_variables=stop_variables,
@@ -190,20 +225,44 @@ def generate_graph():
         }), 500
 
 
+@app.route('/api/countries', methods=['GET'])
+def get_countries():
+    """Get list of available countries."""
+    return jsonify({
+        'success': True,
+        'countries': [
+            {'code': 'US', 'name': 'United States', 'variableCount': len(US_VARIABLES_CACHE)},
+            {'code': 'UK', 'name': 'United Kingdom', 'variableCount': len(UK_VARIABLES_CACHE)}
+        ]
+    })
+
+
 @app.route('/api/search', methods=['GET'])
 def search_variables():
     """Search variables by name or label."""
     try:
         query = request.args.get('q', '').lower()
+        country = request.args.get('country', 'US').upper()
+        
+        # Select appropriate cache
+        if country == 'UK':
+            cache = UK_VARIABLES_CACHE
+        else:
+            cache = US_VARIABLES_CACHE
+        
         if len(query) < 2:
             return jsonify({
                 'success': True,
-                'results': []
+                'results': [],
+                'country': country
             })
         
         results = []
-        for name, data in VARIABLES_CACHE.items():
-            label = data.get('label', '').lower()
+        for name, data in cache.items():
+            label = data.get('label', '')
+            if label is None:
+                label = ''
+            label = label.lower()
             if query in name.lower() or query in label:
                 results.append({
                     'name': name,

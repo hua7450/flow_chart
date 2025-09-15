@@ -86,3 +86,6 @@ coverage.xml
 # Backup files
 *.bak
 *.backup
+
+# PolicyEngine submodules (cloned separately for local development)
+policyengine-uk/
