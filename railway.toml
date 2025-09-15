@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "git clone https://github.com/PolicyEngine/policyengine-us.git policyengine-us 2>/dev/null || true && pip install -r requirements.txt"
+buildCommand = "git clone https://github.com/PolicyEngine/policyengine-us.git policyengine-us 2>/dev/null || true && git clone https://github.com/PolicyEngine/policyengine-uk.git policyengine-uk 2>/dev/null || true && pip install -r requirements.txt"
 
 [deploy]
 startCommand = "cd backend && python api.py"

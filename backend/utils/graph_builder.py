@@ -55,7 +55,7 @@ class GraphBuilder:
                         defined_for_vars = node_data['data'].get('defined_for', [])
                         if isinstance(defined_for_vars, str):
                             defined_for_vars = [defined_for_vars]
-                        if var_name in defined_for_vars:
+                        if defined_for_vars and var_name in defined_for_vars:
                             is_defined_for = True
                             break
                 
