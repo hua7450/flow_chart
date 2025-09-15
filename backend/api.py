@@ -27,7 +27,10 @@ CORS(app)  # Enable CORS for React frontend
 variable_extractor = VariableExtractor()
 enhanced_extractor = EnhancedVariableExtractor()
 uk_variable_extractor = UKVariableExtractor()
-parameter_handler = ParameterHandler()
+us_parameter_handler = ParameterHandler(country="US")
+uk_parameter_handler = ParameterHandler(country="UK")
+# Default to US for backward compatibility
+parameter_handler = us_parameter_handler
 graph_builder = GraphBuilder(parameter_handler)
 
 # Cache variables for both countries (loaded once at startup)
@@ -131,17 +134,20 @@ def get_variable_details(variable_name):
         var_data = cache[variable_name]
         
         # Load parameter values if they exist
+        # Use the appropriate parameter handler based on country
+        country_param_handler = uk_parameter_handler if country == 'UK' else us_parameter_handler
+        
         parameters = {}
         if var_data.get('parameters'):
             for param_name, param_path in var_data['parameters'].items():
-                param_data = parameter_handler.load_parameter(param_path)
+                param_data = country_param_handler.load_parameter(param_path)
                 if param_data:
                     parameters[param_name] = {
                         'path': param_path,
                         'label': param_data.get('metadata', {}).get('label', param_name),
-                        'value': parameter_handler.format_value(param_data, param_name, 'Summary'),
+                        'value': country_param_handler.format_value(param_data, param_name, 'Summary'),
                         'unit': param_data.get('metadata', {}).get('unit', ''),
-                        'structure': parameter_handler.detect_structure(param_data)
+                        'structure': country_param_handler.detect_structure(param_data)
                     }
         
         return jsonify({
@@ -194,8 +200,14 @@ def generate_graph():
         no_params_list = data.get('noParamsList', [])
         show_labels = data.get('showLabels', True)
         
+        # Use the appropriate parameter handler based on country
+        if country == 'UK':
+            country_graph_builder = GraphBuilder(uk_parameter_handler)
+        else:
+            country_graph_builder = GraphBuilder(us_parameter_handler)
+        
         # Build the dependency graph
-        graph_data = graph_builder.build_graph(
+        graph_data = country_graph_builder.build_graph(
             cache,
             variable_name,
             max_depth=max_depth,

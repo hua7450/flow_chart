@@ -197,9 +197,8 @@ class UKVariableExtractor:
             elif isinstance(item, ast.FunctionDef) and item.name == 'formula':
                 formula_vars, params, adds, subtracts = self._extract_formula_dependencies(item)
                 metadata['variables'].update(formula_vars)
-                # Convert parameters list to dict format for compatibility
-                for param in params:
-                    metadata['parameters'][param] = param
+                # Parameters are now already a dict
+                metadata['parameters'].update(params)
                 metadata['adds'].extend(adds)
                 metadata['subtracts'].extend(subtracts)
         
@@ -252,13 +251,81 @@ class UKVariableExtractor:
                 return node.func.id
         return None
     
+    def _extract_parameter_path(self, node: ast.Attribute) -> str:
+        """Extract parameter path from attribute chain starting with parameters(period)."""
+        path_parts = []
+        current = node
+        
+        # Walk up the attribute chain
+        while isinstance(current, ast.Attribute):
+            path_parts.append(current.attr)
+            current = current.value
+        
+        # Check if this chain starts with parameters(period)
+        if isinstance(current, ast.Call):
+            if (isinstance(current.func, ast.Name) and 
+                current.func.id == 'parameters' and 
+                len(current.args) >= 1):
+                # This is a parameters(period) call, reverse the path and join
+                path_parts.reverse()
+                return '.'.join(path_parts) if path_parts else ''
+        
+        return ''
+    
     def _extract_formula_dependencies(self, func_node: ast.FunctionDef) -> tuple:
         """Extract variable and parameter dependencies from formula"""
         variables = set()
-        parameters = []
+        parameters = {}
         adds = []
         subtracts = []
+        param_var_assignments = {}
         
+        # First pass: identify parameter assignments like p = parameters(period).gov.dwp...
+        for node in ast.walk(func_node):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        # Look for parameters(period) assignments
+                        if isinstance(node.value, ast.Attribute):
+                            param_path = self._extract_parameter_path(node.value)
+                            if param_path:
+                                # Store as both a parameter and track for sub-attribute access
+                                parameters[target.id] = param_path
+                                param_var_assignments[target.id] = param_path
+                        elif isinstance(node.value, ast.Subscript):
+                            # Handle subscripted parameters
+                            if isinstance(node.value.value, ast.Attribute):
+                                param_path = self._extract_parameter_path(node.value.value)
+                                if param_path:
+                                    param_name = param_path.split('.')[-1]
+                                    parameters[param_name] = param_path
+        
+        # Second pass: find actual parameter usage (e.g., wfp.amount.higher)
+        for node in ast.walk(func_node):
+            if isinstance(node, ast.Attribute):
+                # Check if this is a parameter usage like wfp.amount.higher
+                # Build the full chain from this attribute node
+                chain = []
+                current = node
+                while isinstance(current, ast.Attribute):
+                    chain.append(current.attr)
+                    current = current.value
+                
+                # Check if the base is a parameter variable (like 'wfp')
+                if isinstance(current, ast.Name) and current.id in param_var_assignments:
+                    chain.reverse()  # Now chain is ['amount', 'higher'] for wfp.amount.higher
+                    base_path = param_var_assignments[current.id]
+                    
+                    # Combine base path with the attribute chain
+                    full_param_path = base_path
+                    for part in chain:
+                        full_param_path = f"{full_param_path}.{part}"
+                    
+                    # Use the last part as the parameter name (e.g., 'higher')
+                    param_name = chain[-1] if chain else node.attr
+                    parameters[param_name] = full_param_path
+        
+        # Third pass: extract variables and other operations
         for node in ast.walk(func_node):
             # Look for variable references (e.g., household("variable_name", period))
             if isinstance(node, ast.Call):
@@ -268,16 +335,8 @@ class UKVariableExtractor:
                         if isinstance(var_name, str):
                             variables.add(var_name)
                 
-                # Look for parameter references
-                elif isinstance(node.func, ast.Attribute):
-                    if node.func.attr == 'parameter' and len(node.args) >= 1:
-                        if isinstance(node.args[0], ast.Constant):
-                            param_path = node.args[0].value
-                            if isinstance(param_path, str):
-                                parameters.append(param_path)
-                
-                # Look for add/subtract operations
-                elif isinstance(node.func, ast.Attribute):
+                # Look for add/subtract operations  
+                if isinstance(node.func, ast.Attribute):
                     if node.func.attr == 'add' and len(node.args) >= 2:
                         for arg in node.args[1:]:
                             if isinstance(arg, ast.Constant) and isinstance(arg.value, str):

@@ -13,13 +13,22 @@ from datetime import datetime
 class ParameterHandler:
     """Handles PolicyEngine parameter operations."""
     
-    def __init__(self, base_paths: list = None):
+    def __init__(self, country: str = "US", base_paths: list = None):
         if base_paths is None:
-            base_paths = [
-                Path("../policyengine-us/policyengine_us/parameters"),
-                Path("../policyengine-us/policyengine_us/data/parameters")
-            ]
+            if country == "US":
+                base_paths = [
+                    Path("../policyengine-us/policyengine_us/parameters"),
+                    Path("../policyengine-us/policyengine_us/data/parameters")
+                ]
+            elif country == "UK":
+                base_paths = [
+                    Path("../policyengine-uk/policyengine_uk/parameters"),
+                    Path("../policyengine-uk/policyengine_uk/data/parameters")
+                ]
+            else:
+                base_paths = []
         self.base_paths = base_paths
+        self.country = country
     
     def load_parameter(self, param_path: str) -> Optional[Dict]:
         """Load a parameter YAML file."""
