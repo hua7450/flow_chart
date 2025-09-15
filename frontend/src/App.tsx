@@ -71,7 +71,6 @@ function App() {
   const [error, setError] = useState<string>('');
   const [detailsOpen, setDetailsOpen] = useState<boolean>(false);
   const [selectedCountry, setSelectedCountry] = useState<string>('US');
-  const [variableCount, setVariableCount] = useState<number>(0);
   
   // Controls
   const [maxDepth, setMaxDepth] = useState<number>(10);
@@ -113,7 +112,6 @@ function App() {
       });
       if (response.data.success) {
         setVariables(response.data.variables);
-        setVariableCount(response.data.total);
       }
     } catch (err) {
       setError('Failed to load variables');
