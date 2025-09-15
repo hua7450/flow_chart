@@ -407,8 +407,8 @@ function App() {
                     cursor: 'pointer'
                   }}
                 >
-                  <option value="US">🇺🇸 United States ({variableCount > 0 ? variableCount.toLocaleString() : '...'} variables)</option>
-                  <option value="UK">🇬🇧 United Kingdom ({selectedCountry === 'UK' && variableCount > 0 ? variableCount.toLocaleString() : '670'} variables)</option>
+                  <option value="US">🇺🇸 United States</option>
+                  <option value="UK">🇬🇧 United Kingdom</option>
                 </select>
               </div>
             </div>
