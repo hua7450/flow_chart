@@ -215,11 +215,16 @@ class VariableExtractor:
                     elif attr_name == 'definition_period':
                         metadata['definition_period'] = node.value.value
                 
+                # Extract entity (e.g., Person, Household, TaxUnit, SPMUnit)
+                elif attr_name == 'entity':
+                    if isinstance(node.value, ast.Name):
+                        metadata['entity'] = node.value.id
+
                 # Extract value_type (e.g., Enum, float, int)
                 elif attr_name == 'value_type':
                     if isinstance(node.value, ast.Name):
                         metadata['value_type'] = node.value.id
-                
+
                 # Extract possible_values (for Enum types)
                 elif attr_name == 'possible_values':
                     if isinstance(node.value, ast.Name):

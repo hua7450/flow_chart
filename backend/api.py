@@ -177,19 +177,20 @@ def generate_graph():
         data = request.json
         variable_name = data.get('variable')
         country = data.get('country', 'US').upper()
-        
+        reverse_mode = data.get('reverseMode', False)  # New parameter for reverse search
+
         # Select appropriate cache
         if country == 'UK':
             cache = UK_VARIABLES_CACHE
         else:
             cache = US_VARIABLES_CACHE
-        
+
         if variable_name not in cache:
             return jsonify({
                 'success': False,
                 'error': f'Variable {variable_name} not found in {country} data'
             }), 404
-        
+
         # Build parameters
         max_depth = data.get('maxDepth', 10)
         expand_adds_subtracts = data.get('expandAddsSubtracts', True)
@@ -205,22 +206,36 @@ def generate_graph():
             country_graph_builder = GraphBuilder(uk_parameter_handler)
         else:
             country_graph_builder = GraphBuilder(us_parameter_handler)
-        
-        # Build the dependency graph
-        graph_data = country_graph_builder.build_graph(
-            cache,
-            variable_name,
-            max_depth=max_depth,
-            stop_variables=stop_variables,
-            expand_adds_subtracts=expand_adds_subtracts,
-            show_parameters=show_parameters,
-            param_detail_level=param_detail_level,
-            param_date=param_date,
-            no_params_list=no_params_list
-        )
-        
+
+        # Build the appropriate graph based on mode
+        if reverse_mode:
+            # Build reverse dependency graph (who uses this variable)
+            graph_data = country_graph_builder.build_reverse_graph(
+                cache,
+                variable_name,
+                max_depth=max_depth,
+                expand_adds_subtracts=expand_adds_subtracts,
+                show_parameters=show_parameters,
+                param_detail_level=param_detail_level,
+                param_date=param_date,
+                no_params_list=no_params_list
+            )
+        else:
+            # Build normal dependency graph (what this variable depends on)
+            graph_data = country_graph_builder.build_graph(
+                cache,
+                variable_name,
+                max_depth=max_depth,
+                stop_variables=stop_variables,
+                expand_adds_subtracts=expand_adds_subtracts,
+                show_parameters=show_parameters,
+                param_detail_level=param_detail_level,
+                param_date=param_date,
+                no_params_list=no_params_list
+            )
+
         # Format for vis-network
-        formatted_graph = graph_builder.format_for_vis_network(graph_data, show_labels)
+        formatted_graph = country_graph_builder.format_for_vis_network(graph_data, show_labels)
         
         return jsonify({
             'success': True,

@@ -81,6 +81,7 @@ function App() {
   const [stopVariables, setStopVariables] = useState<string>('');
   const [noParamsList, setNoParamsList] = useState<string>('');
   const [legendExpanded, setLegendExpanded] = useState<boolean>(true);
+  const [reverseMode, setReverseMode] = useState<boolean>(false);  // New state for reverse search
   
   const networkContainer = useRef<HTMLDivElement>(null);
   const networkInstance = useRef<Network | null>(null);
@@ -165,7 +166,8 @@ function App() {
         paramDetailLevel,
         showLabels,
         stopVariables: stopVariables.split('\n').filter(v => v.trim()),
-        noParamsList: noParamsList.split('\n').filter(v => v.trim())
+        noParamsList: noParamsList.split('\n').filter(v => v.trim()),
+        reverseMode  // Send reverse mode flag to backend
       });
 
       if (response.data.success) {
@@ -484,6 +486,34 @@ function App() {
             )}
           </div>
 
+          {/* Reverse Mode Toggle */}
+          <div className="mb-5 p-4 rounded-lg" style={{
+            backgroundColor: PolicyEngineTheme.colors.BLUE_98,
+            border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`
+          }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+                  Search Mode
+                </div>
+                <div className="text-xs mt-1" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
+                  {reverseMode ? "Show what uses this variable" : "Show what this variable depends on"}
+                </div>
+              </div>
+              <button
+                onClick={() => setReverseMode(!reverseMode)}
+                className="px-3 py-2 rounded-lg text-xs font-semibold transition-all"
+                style={{
+                  backgroundColor: reverseMode ? PolicyEngineTheme.colors.TEAL_ACCENT : PolicyEngineTheme.colors.BLUE_PRIMARY,
+                  color: PolicyEngineTheme.colors.WHITE,
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}
+              >
+                {reverseMode ? "↑ Reverse" : "↓ Forward"}
+              </button>
+            </div>
+          </div>
+
           {/* Selected Variable Card */}
           {selectedVariable && (
             <div className="mb-5 p-4 rounded-lg" style={{
@@ -494,7 +524,7 @@ function App() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-xs font-medium mb-1" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
-                    Selected Variable ({selectedCountry})
+                    Selected Variable ({selectedCountry}) - {reverseMode ? "Reverse Search" : "Forward Search"}
                   </div>
                   <div className="font-mono text-sm font-bold" style={{ color: PolicyEngineTheme.colors.TEAL_PRESSED }}>
                     {selectedVariable}
@@ -761,7 +791,7 @@ function App() {
               border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
               boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
             }}>
-              <h3 
+              <h3
                 className="text-sm font-semibold cursor-pointer flex items-center gap-1"
                 onClick={() => setLegendExpanded(!legendExpanded)}
                 style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE, userSelect: 'none', margin: 0 }}
@@ -780,51 +810,115 @@ function App() {
                   <path d="M6 9l6 6 6-6" />
                 </svg>
               </h3>
-              
+
               {legendExpanded && (
                 <div className="mt-3 space-y-0">
-                  {/* Node Types */}
+                  {/* Entity Types */}
                   <div>
                     <p className="text-xs font-semibold mb-2" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                      Nodes
+                      Entity Types (Node Colors)
                     </p>
                     <div className="space-y-2" style={{ paddingLeft: '12px' }}>
                       <div className="flex items-center gap-3">
-                        <div style={{ 
+                        <div style={{
                           width: '14px',
                           height: '14px',
-                          borderRadius: '50%',
+                          borderRadius: '2px',
+                          backgroundColor: '#D8E6F3',
+                          border: '1px solid #2C6496',
+                          flexShrink: 0
+                        }}></div>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Person</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div style={{
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '2px',
+                          backgroundColor: '#D4F1D4',
+                          border: '1px solid #2D7A2D',
+                          flexShrink: 0
+                        }}></div>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Household</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div style={{
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '2px',
+                          backgroundColor: '#E8D5F2',
+                          border: '1px solid #7B4397',
+                          flexShrink: 0
+                        }}></div>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>TaxUnit</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div style={{
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '2px',
+                          backgroundColor: '#FFE5CC',
+                          border: '1px solid #CC6600',
+                          flexShrink: 0
+                        }}></div>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>SPMUnit</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div style={{
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '2px',
+                          backgroundColor: '#D0F4F0',
+                          border: '1px solid #00897B',
+                          flexShrink: 0
+                        }}></div>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Family</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div style={{
+                    borderTop: `1px dashed ${PolicyEngineTheme.colors.BLUE_95}`,
+                    marginTop: '6px',
+                    marginBottom: '6px'
+                  }}></div>
+
+                  {/* Special Nodes */}
+                  <div>
+                    <p className="text-xs font-semibold mb-2" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+                      Special Nodes
+                    </p>
+                    <div className="space-y-2" style={{ paddingLeft: '12px' }}>
+                      <div className="flex items-center gap-3">
+                        <div style={{
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '2px',
                           backgroundColor: PolicyEngineTheme.colors.TEAL_ACCENT,
+                          border: '1px solid #227773',
                           flexShrink: 0
                         }}></div>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Root</span>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Root Variable</span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <div style={{ 
+                        <div style={{
                           width: '14px',
                           height: '14px',
-                          borderRadius: '50%',
-                          backgroundColor: PolicyEngineTheme.colors.BLUE_PRIMARY,
+                          borderRadius: '2px',
+                          backgroundColor: '#F7FAFD',
+                          border: '1px solid #b50d0d',
                           flexShrink: 0
                         }}></div>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Dependency</span>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Stop Variable</span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <div style={{ 
+                        <div style={{
                           width: '14px',
                           height: '14px',
-                          borderRadius: '50%',
-                          backgroundColor: PolicyEngineTheme.colors.DARK_RED,
-                          flexShrink: 0
-                        }}></div>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Stop</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div style={{ 
-                          width: '14px',
-                          height: '14px',
-                          borderRadius: '50%',
-                          backgroundColor: '#8B4B9B',
+                          borderRadius: '2px',
+                          backgroundColor: '#E6D5F7',
+                          border: '1px solid #8B4B9B',
                           flexShrink: 0
                         }}></div>
                         <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Defined For</span>
@@ -833,16 +927,48 @@ function App() {
                   </div>
 
                   {/* Divider */}
-                  <div style={{ 
+                  <div style={{
                     borderTop: `1px dashed ${PolicyEngineTheme.colors.BLUE_95}`,
                     marginTop: '6px',
                     marginBottom: '6px'
                   }}></div>
 
-                  {/* Edge Types */}
+                  {/* Value Type Badges */}
                   <div>
                     <p className="text-xs font-semibold mb-2" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                      Edges
+                      Value Types (Badges)
+                    </p>
+                    <div className="space-y-2" style={{ paddingLeft: '12px' }}>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-bold" style={{ minWidth: '20px' }}>✓</span>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Boolean</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-bold" style={{ minWidth: '20px' }}>#</span>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Integer</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-bold" style={{ minWidth: '20px' }}>$</span>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Float/Amount</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-bold" style={{ minWidth: '20px' }}>▼</span>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Enum</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div style={{
+                    borderTop: `1px dashed ${PolicyEngineTheme.colors.BLUE_95}`,
+                    marginTop: '6px',
+                    marginBottom: '6px'
+                  }}></div>
+
+                  {/* Arrow Styles */}
+                  <div>
+                    <p className="text-xs font-semibold mb-2" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+                      Arrow Styles
                     </p>
                     <div className="space-y-2" style={{ paddingLeft: '12px' }}>
                       <div className="flex items-center gap-2">
@@ -850,14 +976,47 @@ function App() {
                         <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Addition</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold" style={{ color: PolicyEngineTheme.colors.DARK_RED, minWidth: '65px' }}>- (red)</span>
+                        <span className="text-sm font-bold" style={{ color: PolicyEngineTheme.colors.DARK_RED, minWidth: '65px' }}>− (red)</span>
                         <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Subtraction</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div style={{ minWidth: '65px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div className="w-8 h-0.5" style={{ backgroundColor: PolicyEngineTheme.colors.GRAY }}></div>
+                        <div style={{ minWidth: '65px', display: 'flex', alignItems: 'center' }}>
+                          <div className="w-8 h-0.5" style={{
+                            background: 'repeating-linear-gradient(to right, #8B4B9B 0, #8B4B9B 5px, transparent 5px, transparent 10px)',
+                            height: '2px'
+                          }}></div>
                         </div>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Reference</span>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Defined For</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div style={{ minWidth: '65px', display: 'flex', alignItems: 'center' }}>
+                          <div className="w-8" style={{ borderTop: '4px solid #808080' }}></div>
+                        </div>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Amount/Float</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div style={{ minWidth: '65px', display: 'flex', alignItems: 'center' }}>
+                          <div className="w-8" style={{ borderTop: '2px solid #808080' }}></div>
+                        </div>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Integer</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div style={{ minWidth: '65px', display: 'flex', alignItems: 'center' }}>
+                          <div className="w-8 h-0.5" style={{
+                            background: 'repeating-linear-gradient(to right, #808080 0, #808080 2px, transparent 2px, transparent 4px)',
+                            height: '1px'
+                          }}></div>
+                        </div>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Boolean</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div style={{ minWidth: '65px', display: 'flex', alignItems: 'center' }}>
+                          <div className="w-8 h-0.5" style={{
+                            background: 'repeating-linear-gradient(to right, #808080 0, #808080 10px, transparent 10px, transparent 15px)',
+                            height: '2px'
+                          }}></div>
+                        </div>
+                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Enum</span>
                       </div>
                     </div>
                   </div>
