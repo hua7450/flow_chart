@@ -105,6 +105,7 @@ function App() {
   const [selectedCountry, setSelectedCountry] = useState<string>('US');
   const [legendExpanded, setLegendExpanded] = useState<boolean>(true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
 
   // Controls
   const [maxDepth, setMaxDepth] = useState<number>(10);
@@ -141,6 +142,8 @@ function App() {
       if (noParamsContainerRef.current && !noParamsContainerRef.current.contains(event.target as Node)) {
         setShowNoParamsDropdown(false);
       }
+      // Close context menu when clicking anywhere
+      setContextMenu(null);
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -190,7 +193,7 @@ function App() {
     loadVariables();
   };
 
-  const generateFlowchart = async () => {
+  const generateFlowchart = async (overrideStopVars?: string[], overrideNoParams?: string[]) => {
     if (!selectedVariable) {
       setError('Please select a variable');
       return;
@@ -208,8 +211,8 @@ function App() {
         showParameters,
         paramDetailLevel,
         showLabels: true,
-        stopVariables: stopVariables,
-        noParamsList: noParamsList
+        stopVariables: overrideStopVars !== undefined ? overrideStopVars : stopVariables,
+        noParamsList: overrideNoParams !== undefined ? overrideNoParams : noParamsList
       });
 
       if (response.data.success) {
@@ -349,6 +352,63 @@ function App() {
 
     networkInstance.current.on("blurNode", function () {
       document.body.style.cursor = 'default';
+    });
+
+    // Add context menu on right-click or regular click
+    networkInstance.current.on("oncontext", function (params) {
+      params.event.preventDefault();
+      if (params.nodes.length > 0) {
+        const nodeId = params.nodes[0];
+        const event = params.event.srcEvent || params.event;
+        // Calculate position with offset to avoid covering the node
+        const menuWidth = 200;
+        const menuHeight = 150;
+        let x = event.clientX + 10;
+        let y = event.clientY + 10;
+
+        // Adjust if menu would go off-screen
+        if (x + menuWidth > window.innerWidth) {
+          x = event.clientX - menuWidth - 10;
+        }
+        if (y + menuHeight > window.innerHeight) {
+          y = event.clientY - menuHeight - 10;
+        }
+
+        setContextMenu({
+          x: x,
+          y: y,
+          nodeId: nodeId
+        });
+      }
+    });
+
+    // Also add context menu on regular click
+    networkInstance.current.on("click", function (params) {
+      if (params.nodes.length > 0) {
+        const nodeId = params.nodes[0];
+        const event = params.event.srcEvent || params.event;
+        // Calculate position with offset to avoid covering the node
+        const menuWidth = 200;
+        const menuHeight = 150;
+        let x = event.clientX + 10;
+        let y = event.clientY + 10;
+
+        // Adjust if menu would go off-screen
+        if (x + menuWidth > window.innerWidth) {
+          x = event.clientX - menuWidth - 10;
+        }
+        if (y + menuHeight > window.innerHeight) {
+          y = event.clientY - menuHeight - 10;
+        }
+
+        setContextMenu({
+          x: x,
+          y: y,
+          nodeId: nodeId
+        });
+      } else {
+        setContextMenu(null);
+      }
     });
 
     networkInstance.current.on("stabilizationIterationsDone", function () {
@@ -1119,7 +1179,7 @@ function App() {
 
           {/* Generate Button */}
           <button
-            onClick={generateFlowchart}
+            onClick={() => generateFlowchart()}
             disabled={loading || !selectedVariable}
             style={{
               width: '100%',
@@ -1366,6 +1426,113 @@ function App() {
           }}
         ></div>
       </main>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            top: contextMenu.y,
+            left: contextMenu.x,
+            backgroundColor: colors.WHITE,
+            border: `1px solid ${colors.BLUE_95}`,
+            borderRadius: borderRadius.md,
+            boxShadow: shadows.xl,
+            zIndex: 10000,
+            minWidth: '180px',
+            overflow: 'hidden'
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              if (!stopVariables.includes(contextMenu.nodeId)) {
+                const newStopVars = [...stopVariables, contextMenu.nodeId];
+                setStopVariables(newStopVars);
+                // Regenerate flowchart with the new stop variables immediately
+                generateFlowchart(newStopVars, undefined);
+              }
+              setContextMenu(null);
+            }}
+            disabled={stopVariables.includes(contextMenu.nodeId)}
+            style={{
+              width: '100%',
+              padding: `${spacing.sm} ${spacing.md}`,
+              textAlign: 'left',
+              fontSize: typography.fontSize.sm,
+              color: stopVariables.includes(contextMenu.nodeId) ? colors.MEDIUM_LIGHT_GRAY : colors.DARKEST_BLUE,
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: stopVariables.includes(contextMenu.nodeId) ? 'not-allowed' : 'pointer',
+              transition: transitions.fast,
+              display: 'flex',
+              alignItems: 'center',
+              gap: spacing.sm
+            }}
+            onMouseEnter={(e) => {
+              if (!stopVariables.includes(contextMenu.nodeId)) {
+                e.currentTarget.style.backgroundColor = colors.TEAL_LIGHT;
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span>➕</span>
+            <span>Add to Stop Variables</span>
+          </button>
+          <button
+            onClick={() => {
+              if (!noParamsList.includes(contextMenu.nodeId)) {
+                const newNoParams = [...noParamsList, contextMenu.nodeId];
+                setNoParamsList(newNoParams);
+                // Regenerate flowchart with the new no-params list immediately
+                generateFlowchart(undefined, newNoParams);
+              }
+              setContextMenu(null);
+            }}
+            disabled={noParamsList.includes(contextMenu.nodeId)}
+            style={{
+              width: '100%',
+              padding: `${spacing.sm} ${spacing.md}`,
+              textAlign: 'left',
+              fontSize: typography.fontSize.sm,
+              color: noParamsList.includes(contextMenu.nodeId) ? colors.MEDIUM_LIGHT_GRAY : colors.DARKEST_BLUE,
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderTop: `1px solid ${colors.BLUE_98}`,
+              cursor: noParamsList.includes(contextMenu.nodeId) ? 'not-allowed' : 'pointer',
+              transition: transitions.fast,
+              display: 'flex',
+              alignItems: 'center',
+              gap: spacing.sm
+            }}
+            onMouseEnter={(e) => {
+              if (!noParamsList.includes(contextMenu.nodeId)) {
+                e.currentTarget.style.backgroundColor = colors.TEAL_LIGHT;
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span>🚫</span>
+            <span>Hide Parameters</span>
+          </button>
+          <div
+            style={{
+              padding: `${spacing.xs} ${spacing.md}`,
+              fontSize: typography.fontSize.xs,
+              color: colors.DARK_GRAY,
+              backgroundColor: colors.BLUE_98,
+              borderTop: `1px solid ${colors.BLUE_95}`,
+              fontFamily: typography.fontFamily.mono
+            }}
+          >
+            {contextMenu.nodeId}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
