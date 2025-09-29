@@ -1519,6 +1519,48 @@ function App() {
             <span>🚫</span>
             <span>Hide Parameters</span>
           </button>
+          <button
+            onClick={async () => {
+              try {
+                const response = await axios.get(`${API_BASE}/variable/${encodeURIComponent(contextMenu.nodeId)}/source`, {
+                  params: { country: selectedCountry }
+                });
+                if (response.data.success) {
+                  window.open(response.data.url, '_blank');
+                } else {
+                  alert(`Could not find source code for ${contextMenu.nodeId}: ${response.data.error}`);
+                }
+              } catch (err: any) {
+                console.error('Failed to get source URL:', err);
+                alert(`Error getting source code: ${err.response?.data?.error || err.message}`);
+              }
+              setContextMenu(null);
+            }}
+            style={{
+              width: '100%',
+              padding: `${spacing.sm} ${spacing.md}`,
+              textAlign: 'left',
+              fontSize: typography.fontSize.sm,
+              color: colors.DARKEST_BLUE,
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderTop: `1px solid ${colors.BLUE_98}`,
+              cursor: 'pointer',
+              transition: transitions.fast,
+              display: 'flex',
+              alignItems: 'center',
+              gap: spacing.sm
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = colors.TEAL_LIGHT;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span>📄</span>
+            <span>View Source Code</span>
+          </button>
           <div
             style={{
               padding: `${spacing.xs} ${spacing.md}`,
