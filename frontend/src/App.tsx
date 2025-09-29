@@ -151,13 +151,19 @@ function App() {
       const variableExists = variables.some(v => v.name === variableParam);
       if (variableExists) {
         setSelectedVariable(variableParam);
-        // Trigger graph generation after a short delay
-        setTimeout(() => {
-          generateFlowchart();
-        }, 100);
       }
     }
   }, [variables]); // Only run when variables change
+
+  // Generate flowchart when selectedVariable is set from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const variableParam = params.get('variable');
+
+    if (variableParam && selectedVariable === variableParam && graphData === null) {
+      generateFlowchart();
+    }
+  }, [selectedVariable]); // Run when selectedVariable changes
 
   // Close dropdown when clicking outside
   useEffect(() => {
