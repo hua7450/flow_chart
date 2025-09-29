@@ -78,6 +78,20 @@ const LoadingSpinner = () => (
   }}></div>
 );
 
+const FullscreenIcon = ({ isFullscreen }: { isFullscreen: boolean }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    {isFullscreen ? (
+      <>
+        <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
+      </>
+    ) : (
+      <>
+        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+      </>
+    )}
+  </svg>
+);
+
 function App() {
   // State
   const [variables, setVariables] = useState<Variable[]>([]);
@@ -90,6 +104,7 @@ function App() {
   const [detailsOpen, setDetailsOpen] = useState<boolean>(false);
   const [selectedCountry, setSelectedCountry] = useState<string>('US');
   const [legendExpanded, setLegendExpanded] = useState<boolean>(true);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   // Controls
   const [maxDepth, setMaxDepth] = useState<number>(10);
@@ -280,7 +295,7 @@ function App() {
         dragView: true,
         navigationButtons: false,
         keyboard: { enabled: false },
-        zoomSpeed: 0.3,
+        zoomSpeed: 0.5,
         hideEdgesOnDrag: false,
         hideEdgesOnZoom: false,
         hideNodesOnDrag: false
@@ -1289,22 +1304,64 @@ function App() {
       {/* Main Graph Area */}
       <main style={{
         flex: 1,
-        padding: spacing.lg,
+        padding: isFullscreen ? 0 : spacing.lg,
         minWidth: 0,
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        position: isFullscreen ? 'fixed' : 'relative',
+        top: isFullscreen ? 0 : 'auto',
+        left: isFullscreen ? 0 : 'auto',
+        right: isFullscreen ? 0 : 'auto',
+        bottom: isFullscreen ? 0 : 'auto',
+        zIndex: isFullscreen ? 1000 : 'auto',
+        width: isFullscreen ? '100vw' : 'auto'
       }}>
+        {/* Fullscreen Button */}
+        {graphData && (
+          <button
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            style={{
+              position: 'absolute',
+              top: isFullscreen ? spacing.md : spacing.lg,
+              right: isFullscreen ? spacing.md : spacing.lg,
+              zIndex: 10,
+              padding: spacing.sm,
+              backgroundColor: colors.WHITE,
+              border: `1px solid ${colors.BLUE_95}`,
+              borderRadius: borderRadius.md,
+              cursor: 'pointer',
+              boxShadow: shadows.md,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: transitions.normal,
+              color: colors.DARKEST_BLUE
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = colors.BLUE_98;
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = colors.WHITE;
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+          >
+            <FullscreenIcon isFullscreen={isFullscreen} />
+          </button>
+        )}
+
         <div
           ref={networkContainer}
           style={{
             width: '100%',
             height: '100%',
             backgroundColor: colors.WHITE,
-            boxShadow: shadows.lg,
-            border: `1px solid ${colors.BLUE_95}`,
-            borderRadius: borderRadius.lg,
+            boxShadow: isFullscreen ? 'none' : shadows.lg,
+            border: isFullscreen ? 'none' : `1px solid ${colors.BLUE_95}`,
+            borderRadius: isFullscreen ? 0 : borderRadius.lg,
             flex: 1
           }}
         ></div>
