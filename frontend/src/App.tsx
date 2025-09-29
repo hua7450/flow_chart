@@ -917,301 +917,108 @@ function App() {
 
             {detailsOpen && (
               <div style={{ padding: spacing.md }}>
-                {/* Max Depth */}
-                <div style={{ marginBottom: spacing.md }}>
-                  <label style={{
-                    display: 'block',
+                {/* Graph Content Section */}
+                <div style={{
+                  marginBottom: spacing.lg,
+                  paddingBottom: spacing.md,
+                  borderBottom: `2px solid ${colors.BLUE_95}`
+                }}>
+                  <h4 style={{
                     fontSize: typography.fontSize.xs,
-                    fontWeight: typography.fontWeight.medium,
-                    marginBottom: spacing.sm,
-                    color: colors.DARKEST_BLUE
+                    fontWeight: typography.fontWeight.bold,
+                    marginBottom: spacing.md,
+                    color: colors.BLUE_PRIMARY,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
                   }}>
-                    Max Depth: <span style={{ fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>{maxDepth}</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="20"
-                    value={maxDepth}
-                    onChange={(e) => setMaxDepth(Number(e.target.value))}
-                    style={{
-                      width: '100%',
-                      accentColor: colors.TEAL_ACCENT,
-                      cursor: 'pointer'
-                    }}
-                  />
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: typography.fontSize.xs,
-                    marginTop: spacing.xs,
-                    color: colors.DARK_GRAY
-                  }}>
-                    <span>1</span>
-                    <span>20</span>
-                  </div>
-                </div>
+                    Graph Content
+                  </h4>
 
-                {/* Layout Direction */}
-                <div style={{ marginBottom: spacing.md }}>
-                  <label style={{
-                    display: 'block',
-                    fontSize: typography.fontSize.xs,
-                    fontWeight: typography.fontWeight.medium,
-                    marginBottom: spacing.xs,
-                    color: colors.DARKEST_BLUE
-                  }}>
-                    Layout Direction:
-                  </label>
-                  <select
-                    value={layoutDirection}
-                    onChange={(e) => setLayoutDirection(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: spacing.sm,
-                      fontSize: typography.fontSize.sm,
-                      border: `1px solid ${colors.BLUE_95}`,
-                      borderRadius: borderRadius.md,
-                      backgroundColor: colors.WHITE,
-                      color: colors.DARKEST_BLUE,
-                      cursor: 'pointer',
-                      transition: transitions.normal
-                    }}
-                  >
-                    <option value="UD">Top to Bottom (⬇)</option>
-                    <option value="DU">Bottom to Top (⬆)</option>
-                    <option value="LR">Left to Right (➡)</option>
-                    <option value="RL">Right to Left (⬅)</option>
-                  </select>
-                </div>
-
-                {/* Node Spacing */}
-                <div style={{ marginBottom: spacing.md }}>
-                  <label style={{
-                    display: 'block',
-                    fontSize: typography.fontSize.xs,
-                    fontWeight: typography.fontWeight.medium,
-                    marginBottom: spacing.sm,
-                    color: colors.DARKEST_BLUE
-                  }}>
-                    Node Spacing: <span style={{ fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>{nodeSpacing}px</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="100"
-                    max="500"
-                    step="50"
-                    value={nodeSpacing}
-                    onChange={(e) => setNodeSpacing(Number(e.target.value))}
-                    style={{
-                      width: '100%',
-                      accentColor: colors.TEAL_ACCENT,
-                      cursor: 'pointer'
-                    }}
-                  />
-                </div>
-
-                {/* Level Separation */}
-                <div style={{ marginBottom: spacing.md }}>
-                  <label style={{
-                    display: 'block',
-                    fontSize: typography.fontSize.xs,
-                    fontWeight: typography.fontWeight.medium,
-                    marginBottom: spacing.sm,
-                    color: colors.DARKEST_BLUE
-                  }}>
-                    Level Separation: <span style={{ fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>{levelSeparation}px</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="50"
-                    max="300"
-                    step="25"
-                    value={levelSeparation}
-                    onChange={(e) => setLevelSeparation(Number(e.target.value))}
-                    style={{
-                      width: '100%',
-                      accentColor: colors.TEAL_ACCENT,
-                      cursor: 'pointer'
-                    }}
-                  />
-                </div>
-
-                {/* Checkboxes */}
-                <div style={{ marginBottom: spacing.md }}>
-                  {[
-                    { label: 'Expand Adds/Subtracts', checked: expandAddsSubtracts, onChange: setExpandAddsSubtracts },
-                    { label: 'Show Parameters', checked: showParameters, onChange: setShowParameters }
-                  ].map((item, idx) => (
-                    <label key={idx} style={{
-                      display: 'flex',
-                      alignItems: 'center',
+                  {/* Max Depth */}
+                  <div style={{ marginBottom: spacing.md }}>
+                    <label style={{
+                      display: 'block',
                       fontSize: typography.fontSize.xs,
-                      cursor: 'pointer',
-                      padding: spacing.sm,
-                      borderRadius: borderRadius.sm,
-                      transition: transitions.fast,
-                      marginBottom: spacing.xs
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.WHITE}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={item.checked}
-                        onChange={(e) => item.onChange(e.target.checked)}
-                        style={{
-                          marginRight: spacing.sm,
-                          accentColor: colors.TEAL_ACCENT,
-                          cursor: 'pointer'
-                        }}
-                      />
-                      <span style={{ color: colors.DARKEST_BLUE }}>{item.label}</span>
+                      fontWeight: typography.fontWeight.medium,
+                      marginBottom: spacing.sm,
+                      color: colors.DARKEST_BLUE
+                    }}>
+                      Max Depth: <span style={{ fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>{maxDepth}</span>
                     </label>
-                  ))}
-                </div>
-
-                {/* Parameter Options */}
-                {showParameters && (
-                  <>
-                    <div style={{ marginBottom: spacing.md }}>
-                      <label style={{
-                        display: 'block',
-                        fontSize: typography.fontSize.xs,
-                        fontWeight: typography.fontWeight.medium,
-                        marginBottom: spacing.xs,
-                        color: colors.DARKEST_BLUE
-                      }}>
-                        Parameter Detail Level
-                      </label>
-                      <select
-                        value={paramDetailLevel}
-                        onChange={(e) => setParamDetailLevel(e.target.value)}
-                        style={{
-                          width: '100%',
-                          padding: spacing.sm,
-                          fontSize: typography.fontSize.xs,
-                          borderRadius: borderRadius.md,
-                          border: `1px solid ${colors.BLUE_95}`,
-                          backgroundColor: colors.WHITE,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <option value="Minimal">Minimal</option>
-                        <option value="Summary">Summary</option>
-                        <option value="Full">Full</option>
-                      </select>
+                    <input
+                      type="range"
+                      min="1"
+                      max="20"
+                      value={maxDepth}
+                      onChange={(e) => setMaxDepth(Number(e.target.value))}
+                      style={{
+                        width: '100%',
+                        accentColor: colors.TEAL_ACCENT,
+                        cursor: 'pointer'
+                      }}
+                    />
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: typography.fontSize.xs,
+                      marginTop: spacing.xs,
+                      color: colors.DARK_GRAY
+                    }}>
+                      <span>1</span>
+                      <span>20</span>
                     </div>
+                  </div>
 
-                    <div style={{ marginBottom: spacing.md }}>
-                      <div style={{
+                  {/* Checkboxes */}
+                  <div style={{ marginBottom: spacing.md }}>
+                    {[
+                      { label: 'Expand Adds/Subtracts', checked: expandAddsSubtracts, onChange: setExpandAddsSubtracts },
+                      { label: 'Show Parameters', checked: showParameters, onChange: setShowParameters }
+                    ].map((item, idx) => (
+                      <label key={idx} style={{
                         display: 'flex',
-                        justifyContent: 'space-between',
                         alignItems: 'center',
+                        fontSize: typography.fontSize.xs,
+                        cursor: 'pointer',
+                        padding: spacing.sm,
+                        borderRadius: borderRadius.sm,
+                        transition: transitions.fast,
                         marginBottom: spacing.xs
-                      }}>
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.WHITE}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.checked}
+                          onChange={(e) => item.onChange(e.target.checked)}
+                          style={{
+                            marginRight: spacing.sm,
+                            accentColor: colors.TEAL_ACCENT,
+                            cursor: 'pointer'
+                          }}
+                        />
+                        <span style={{ color: colors.DARKEST_BLUE }}>{item.label}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  {/* Parameter Options */}
+                  {showParameters && (
+                    <>
+                      <div style={{ marginBottom: spacing.md }}>
                         <label style={{
+                          display: 'block',
                           fontSize: typography.fontSize.xs,
                           fontWeight: typography.fontWeight.medium,
+                          marginBottom: spacing.xs,
                           color: colors.DARKEST_BLUE
                         }}>
-                          Don't Show Parameters For:
+                          Parameter Detail Level
                         </label>
-                        {noParamsList.length > 0 && (
-                          <button
-                            onClick={() => setNoParamsList([])}
-                            style={{
-                              fontSize: typography.fontSize.xs,
-                              color: colors.TEAL_PRESSED,
-                              backgroundColor: 'transparent',
-                              padding: spacing.xs,
-                              cursor: 'pointer',
-                              textDecoration: 'underline'
-                            }}
-                          >
-                            Clear all
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Selected no-params variables as chips */}
-                      {noParamsList.length > 0 && (
-                        <div style={{
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          gap: spacing.xs,
-                          marginBottom: spacing.sm,
-                          padding: spacing.sm,
-                          backgroundColor: colors.BLUE_98,
-                          borderRadius: borderRadius.sm,
-                          border: `1px solid ${colors.BLUE_95}`
-                        }}>
-                          {noParamsList.map((variable, idx) => (
-                            <div
-                              key={idx}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: spacing.xs,
-                                padding: `${spacing.xs} ${spacing.sm}`,
-                                backgroundColor: colors.TEAL_ACCENT,
-                                color: colors.WHITE,
-                                borderRadius: borderRadius.sm,
-                                fontSize: typography.fontSize.xs,
-                                fontFamily: typography.fontFamily.mono
-                              }}
-                            >
-                              <span>{variable}</span>
-                              <button
-                                onClick={() => {
-                                  setNoParamsList(noParamsList.filter((_, i) => i !== idx));
-                                }}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  padding: '2px',
-                                  backgroundColor: 'transparent',
-                                  color: colors.WHITE,
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  borderRadius: borderRadius.sm,
-                                  transition: transitions.fast
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = 'transparent';
-                                }}
-                              >
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                                </svg>
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Search input for no-params variables */}
-                      <div style={{ position: 'relative' }} ref={noParamsContainerRef}>
-                        <input
-                          type="text"
-                          placeholder="Search to add variables..."
-                          value={noParamsSearch}
-                          onChange={(e) => {
-                            setNoParamsSearch(e.target.value);
-                            if (e.target.value.length >= 2) {
-                              setShowNoParamsDropdown(true);
-                            } else {
-                              setShowNoParamsDropdown(false);
-                            }
-                          }}
-                          onFocus={() => {
-                            if (noParamsSearch.length >= 2) setShowNoParamsDropdown(true);
-                          }}
+                        <select
+                          value={paramDetailLevel}
+                          onChange={(e) => setParamDetailLevel(e.target.value)}
                           style={{
                             width: '100%',
                             padding: spacing.sm,
@@ -1219,284 +1026,509 @@ function App() {
                             borderRadius: borderRadius.md,
                             border: `1px solid ${colors.BLUE_95}`,
                             backgroundColor: colors.WHITE,
-                            outline: 'none',
-                            transition: transitions.normal,
-                            fontFamily: typography.fontFamily.mono
+                            cursor: 'pointer'
                           }}
-                          onFocusCapture={(e) => {
-                            e.currentTarget.style.borderColor = colors.TEAL_ACCENT;
-                            e.currentTarget.style.boxShadow = `0 0 0 2px ${colors.TEAL_LIGHT}`;
-                          }}
-                          onBlurCapture={(e) => {
-                            e.currentTarget.style.borderColor = colors.BLUE_95;
-                            e.currentTarget.style.boxShadow = 'none';
-                          }}
-                        />
+                        >
+                          <option value="Minimal">Minimal</option>
+                          <option value="Summary">Summary</option>
+                          <option value="Full">Full</option>
+                        </select>
+                      </div>
 
-                        {/* Dropdown for no-params variables */}
-                        {showNoParamsDropdown && noParamsSearch.length >= 2 && (
+                      <div style={{ marginBottom: spacing.md }}>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: spacing.xs
+                        }}>
+                          <label style={{
+                            fontSize: typography.fontSize.xs,
+                            fontWeight: typography.fontWeight.medium,
+                            color: colors.DARKEST_BLUE
+                          }}>
+                            Don't Show Parameters For:
+                          </label>
+                          {noParamsList.length > 0 && (
+                            <button
+                              onClick={() => setNoParamsList([])}
+                              style={{
+                                fontSize: typography.fontSize.xs,
+                                color: colors.TEAL_PRESSED,
+                                backgroundColor: 'transparent',
+                                padding: spacing.xs,
+                                cursor: 'pointer',
+                                textDecoration: 'underline'
+                              }}
+                            >
+                              Clear all
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Selected no-params variables as chips */}
+                        {noParamsList.length > 0 && (
                           <div style={{
-                            position: 'absolute',
-                            zIndex: 100,
-                            width: '100%',
-                            marginTop: spacing.xs,
-                            backgroundColor: colors.WHITE,
-                            borderRadius: borderRadius.md,
-                            boxShadow: shadows.xl,
-                            maxHeight: '200px',
-                            overflowY: 'auto',
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: spacing.xs,
+                            marginBottom: spacing.sm,
+                            padding: spacing.sm,
+                            backgroundColor: colors.BLUE_98,
+                            borderRadius: borderRadius.sm,
                             border: `1px solid ${colors.BLUE_95}`
                           }}>
-                            {variables
-                              .filter(v =>
-                                (v.name.toLowerCase().includes(noParamsSearch.toLowerCase()) ||
-                                (v.label || '').toLowerCase().includes(noParamsSearch.toLowerCase())) &&
-                                !noParamsList.includes(v.name)
-                              )
-                              .slice(0, 8)
-                              .map(v => (
-                                <div
-                                  key={v.name}
+                            {noParamsList.map((variable, idx) => (
+                              <div
+                                key={idx}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: spacing.xs,
+                                  padding: `${spacing.xs} ${spacing.sm}`,
+                                  backgroundColor: colors.TEAL_ACCENT,
+                                  color: colors.WHITE,
+                                  borderRadius: borderRadius.sm,
+                                  fontSize: typography.fontSize.xs,
+                                  fontFamily: typography.fontFamily.mono
+                                }}
+                              >
+                                <span>{variable}</span>
+                                <button
                                   onClick={() => {
-                                    if (!noParamsList.includes(v.name)) {
-                                      setNoParamsList([...noParamsList, v.name]);
-                                      setNoParamsSearch('');
-                                      setShowNoParamsDropdown(false);
-                                    }
+                                    setNoParamsList(noParamsList.filter((_, i) => i !== idx));
                                   }}
                                   style={{
-                                    padding: spacing.sm,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: '2px',
+                                    backgroundColor: 'transparent',
+                                    color: colors.WHITE,
+                                    border: 'none',
                                     cursor: 'pointer',
-                                    transition: transitions.fast,
-                                    borderBottom: `1px solid ${colors.BLUE_98}`,
-                                    fontSize: typography.fontSize.xs,
-                                    fontFamily: typography.fontFamily.mono
+                                    borderRadius: borderRadius.sm,
+                                    transition: transitions.fast
                                   }}
                                   onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = colors.TEAL_LIGHT;
+                                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
                                   }}
                                   onMouseLeave={(e) => {
                                     e.currentTarget.style.backgroundColor = 'transparent';
                                   }}
                                 >
-                                  {v.name}
-                                </div>
-                              ))}
-                            {variables.filter(v =>
-                              (v.name.toLowerCase().includes(noParamsSearch.toLowerCase()) ||
-                              (v.label || '').toLowerCase().includes(noParamsSearch.toLowerCase())) &&
-                              !noParamsList.includes(v.name)
-                            ).length === 0 && (
-                              <div style={{
-                                padding: spacing.sm,
-                                fontSize: typography.fontSize.xs,
-                                color: colors.DARK_GRAY
-                              }}>
-                                No variables found
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                  </svg>
+                                </button>
                               </div>
-                            )}
+                            ))}
                           </div>
                         )}
+
+                        {/* Search input for no-params variables */}
+                        <div style={{ position: 'relative' }} ref={noParamsContainerRef}>
+                          <input
+                            type="text"
+                            placeholder="Search to add variables..."
+                            value={noParamsSearch}
+                            onChange={(e) => {
+                              setNoParamsSearch(e.target.value);
+                              if (e.target.value.length >= 2) {
+                                setShowNoParamsDropdown(true);
+                              } else {
+                                setShowNoParamsDropdown(false);
+                              }
+                            }}
+                            onFocus={() => {
+                              if (noParamsSearch.length >= 2) setShowNoParamsDropdown(true);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: spacing.sm,
+                              fontSize: typography.fontSize.xs,
+                              borderRadius: borderRadius.md,
+                              border: `1px solid ${colors.BLUE_95}`,
+                              backgroundColor: colors.WHITE,
+                              outline: 'none',
+                              transition: transitions.normal,
+                              fontFamily: typography.fontFamily.mono
+                            }}
+                            onFocusCapture={(e) => {
+                              e.currentTarget.style.borderColor = colors.TEAL_ACCENT;
+                              e.currentTarget.style.boxShadow = `0 0 0 2px ${colors.TEAL_LIGHT}`;
+                            }}
+                            onBlurCapture={(e) => {
+                              e.currentTarget.style.borderColor = colors.BLUE_95;
+                              e.currentTarget.style.boxShadow = 'none';
+                            }}
+                          />
+
+                          {/* Dropdown for no-params variables */}
+                          {showNoParamsDropdown && noParamsSearch.length >= 2 && (
+                            <div style={{
+                              position: 'absolute',
+                              zIndex: 100,
+                              width: '100%',
+                              marginTop: spacing.xs,
+                              backgroundColor: colors.WHITE,
+                              borderRadius: borderRadius.md,
+                              boxShadow: shadows.xl,
+                              maxHeight: '200px',
+                              overflowY: 'auto',
+                              border: `1px solid ${colors.BLUE_95}`
+                            }}>
+                              {variables
+                                .filter(v =>
+                                  (v.name.toLowerCase().includes(noParamsSearch.toLowerCase()) ||
+                                  (v.label || '').toLowerCase().includes(noParamsSearch.toLowerCase())) &&
+                                  !noParamsList.includes(v.name)
+                                )
+                                .slice(0, 8)
+                                .map(v => (
+                                  <div
+                                    key={v.name}
+                                    onClick={() => {
+                                      if (!noParamsList.includes(v.name)) {
+                                        setNoParamsList([...noParamsList, v.name]);
+                                        setNoParamsSearch('');
+                                        setShowNoParamsDropdown(false);
+                                      }
+                                    }}
+                                    style={{
+                                      padding: spacing.sm,
+                                      cursor: 'pointer',
+                                      transition: transitions.fast,
+                                      borderBottom: `1px solid ${colors.BLUE_98}`,
+                                      fontSize: typography.fontSize.xs,
+                                      fontFamily: typography.fontFamily.mono
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.backgroundColor = colors.TEAL_LIGHT;
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'transparent';
+                                    }}
+                                  >
+                                    {v.name}
+                                  </div>
+                                ))}
+                              {variables.filter(v =>
+                                (v.name.toLowerCase().includes(noParamsSearch.toLowerCase()) ||
+                                (v.label || '').toLowerCase().includes(noParamsSearch.toLowerCase())) &&
+                                !noParamsList.includes(v.name)
+                              ).length === 0 && (
+                                <div style={{
+                                  padding: spacing.sm,
+                                  fontSize: typography.fontSize.xs,
+                                  color: colors.DARK_GRAY
+                                }}>
+                                  No variables found
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </>
-                )}
+                    </>
+                  )}
 
-                {/* Stop Variables */}
-                <div>
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: spacing.xs
-                  }}>
-                    <label style={{
-                      fontSize: typography.fontSize.xs,
-                      fontWeight: typography.fontWeight.medium,
-                      color: colors.DARKEST_BLUE
-                    }}>
-                      Stop Variables:
-                    </label>
-                    {stopVariables.length > 0 && (
-                      <button
-                        onClick={() => setStopVariables([])}
-                        style={{
-                          fontSize: typography.fontSize.xs,
-                          color: colors.TEAL_PRESSED,
-                          backgroundColor: 'transparent',
-                          padding: spacing.xs,
-                          cursor: 'pointer',
-                          textDecoration: 'underline'
-                        }}
-                      >
-                        Clear all
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Selected stop variables as chips */}
-                  {stopVariables.length > 0 && (
+                  {/* Stop Variables */}
+                  <div>
                     <div style={{
                       display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: spacing.xs,
-                      marginBottom: spacing.sm,
-                      padding: spacing.sm,
-                      backgroundColor: colors.BLUE_98,
-                      borderRadius: borderRadius.sm,
-                      border: `1px solid ${colors.BLUE_95}`
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: spacing.xs
                     }}>
-                      {stopVariables.map((variable, idx) => (
-                        <div
-                          key={idx}
+                      <label style={{
+                        fontSize: typography.fontSize.xs,
+                        fontWeight: typography.fontWeight.medium,
+                        color: colors.DARKEST_BLUE
+                      }}>
+                        Stop Variables:
+                      </label>
+                      {stopVariables.length > 0 && (
+                        <button
+                          onClick={() => setStopVariables([])}
                           style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: spacing.xs,
-                            padding: `${spacing.xs} ${spacing.sm}`,
-                            backgroundColor: colors.BLUE_PRIMARY,
-                            color: colors.WHITE,
-                            borderRadius: borderRadius.sm,
                             fontSize: typography.fontSize.xs,
-                            fontFamily: typography.fontFamily.mono
+                            color: colors.TEAL_PRESSED,
+                            backgroundColor: 'transparent',
+                            padding: spacing.xs,
+                            cursor: 'pointer',
+                            textDecoration: 'underline'
                           }}
                         >
-                          <span>{variable}</span>
-                          <button
-                            onClick={() => {
-                              setStopVariables(stopVariables.filter((_, i) => i !== idx));
-                            }}
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Selected stop variables as chips */}
+                    {stopVariables.length > 0 && (
+                      <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: spacing.xs,
+                        marginBottom: spacing.sm,
+                        padding: spacing.sm,
+                        backgroundColor: colors.BLUE_98,
+                        borderRadius: borderRadius.sm,
+                        border: `1px solid ${colors.BLUE_95}`
+                      }}>
+                        {stopVariables.map((variable, idx) => (
+                          <div
+                            key={idx}
                             style={{
                               display: 'flex',
                               alignItems: 'center',
-                              justifyContent: 'center',
-                              padding: '2px',
-                              backgroundColor: 'transparent',
+                              gap: spacing.xs,
+                              padding: `${spacing.xs} ${spacing.sm}`,
+                              backgroundColor: colors.BLUE_PRIMARY,
                               color: colors.WHITE,
-                              border: 'none',
-                              cursor: 'pointer',
                               borderRadius: borderRadius.sm,
-                              transition: transitions.fast
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent';
+                              fontSize: typography.fontSize.xs,
+                              fontFamily: typography.fontFamily.mono
                             }}
                           >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <line x1="18" y1="6" x2="6" y2="18"></line>
-                              <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Search input for stop variables */}
-                  <div style={{ position: 'relative' }} ref={stopVarContainerRef}>
-                    <input
-                      type="text"
-                      placeholder="Search to add stop variables..."
-                      value={stopVarSearch}
-                      onChange={(e) => {
-                        setStopVarSearch(e.target.value);
-                        if (e.target.value.length >= 2) {
-                          setShowStopVarDropdown(true);
-                        } else {
-                          setShowStopVarDropdown(false);
-                        }
-                      }}
-                      onFocus={() => {
-                        if (stopVarSearch.length >= 2) setShowStopVarDropdown(true);
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: spacing.sm,
-                        fontSize: typography.fontSize.xs,
-                        borderRadius: borderRadius.md,
-                        border: `1px solid ${colors.BLUE_95}`,
-                        backgroundColor: colors.WHITE,
-                        outline: 'none',
-                        transition: transitions.normal,
-                        fontFamily: typography.fontFamily.mono
-                      }}
-                      onFocusCapture={(e) => {
-                        e.currentTarget.style.borderColor = colors.TEAL_ACCENT;
-                        e.currentTarget.style.boxShadow = `0 0 0 2px ${colors.TEAL_LIGHT}`;
-                      }}
-                      onBlurCapture={(e) => {
-                        e.currentTarget.style.borderColor = colors.BLUE_95;
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
-                    />
-
-                    {/* Dropdown for stop variables */}
-                    {showStopVarDropdown && stopVarSearch.length >= 2 && (
-                      <div style={{
-                        position: 'absolute',
-                        zIndex: 100,
-                        width: '100%',
-                        marginTop: spacing.xs,
-                        backgroundColor: colors.WHITE,
-                        borderRadius: borderRadius.md,
-                        boxShadow: shadows.xl,
-                        maxHeight: '200px',
-                        overflowY: 'auto',
-                        border: `1px solid ${colors.BLUE_95}`
-                      }}>
-                        {variables
-                          .filter(v =>
-                            (v.name.toLowerCase().includes(stopVarSearch.toLowerCase()) ||
-                            (v.label || '').toLowerCase().includes(stopVarSearch.toLowerCase())) &&
-                            !stopVariables.includes(v.name)
-                          )
-                          .slice(0, 8)
-                          .map(v => (
-                            <div
-                              key={v.name}
+                            <span>{variable}</span>
+                            <button
                               onClick={() => {
-                                if (!stopVariables.includes(v.name)) {
-                                  setStopVariables([...stopVariables, v.name]);
-                                  setStopVarSearch('');
-                                  setShowStopVarDropdown(false);
-                                }
+                                setStopVariables(stopVariables.filter((_, i) => i !== idx));
                               }}
                               style={{
-                                padding: spacing.sm,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '2px',
+                                backgroundColor: 'transparent',
+                                color: colors.WHITE,
+                                border: 'none',
                                 cursor: 'pointer',
-                                transition: transitions.fast,
-                                borderBottom: `1px solid ${colors.BLUE_98}`,
-                                fontSize: typography.fontSize.xs,
-                                fontFamily: typography.fontFamily.mono
+                                borderRadius: borderRadius.sm,
+                                transition: transitions.fast
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = colors.TEAL_LIGHT;
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
                               }}
                               onMouseLeave={(e) => {
                                 e.currentTarget.style.backgroundColor = 'transparent';
                               }}
                             >
-                              {v.name}
-                            </div>
-                          ))}
-                        {variables.filter(v =>
-                          (v.name.toLowerCase().includes(stopVarSearch.toLowerCase()) ||
-                          (v.label || '').toLowerCase().includes(stopVarSearch.toLowerCase())) &&
-                          !stopVariables.includes(v.name)
-                        ).length === 0 && (
-                          <div style={{
-                            padding: spacing.sm,
-                            fontSize: typography.fontSize.xs,
-                            color: colors.DARK_GRAY
-                          }}>
-                            No variables found
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                              </svg>
+                            </button>
                           </div>
-                        )}
+                        ))}
                       </div>
                     )}
+
+                    {/* Search input for stop variables */}
+                    <div style={{ position: 'relative' }} ref={stopVarContainerRef}>
+                      <input
+                        type="text"
+                        placeholder="Search to add stop variables..."
+                        value={stopVarSearch}
+                        onChange={(e) => {
+                          setStopVarSearch(e.target.value);
+                          if (e.target.value.length >= 2) {
+                            setShowStopVarDropdown(true);
+                          } else {
+                            setShowStopVarDropdown(false);
+                          }
+                        }}
+                        onFocus={() => {
+                          if (stopVarSearch.length >= 2) setShowStopVarDropdown(true);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: spacing.sm,
+                          fontSize: typography.fontSize.xs,
+                          borderRadius: borderRadius.md,
+                          border: `1px solid ${colors.BLUE_95}`,
+                          backgroundColor: colors.WHITE,
+                          outline: 'none',
+                          transition: transitions.normal,
+                          fontFamily: typography.fontFamily.mono
+                        }}
+                        onFocusCapture={(e) => {
+                          e.currentTarget.style.borderColor = colors.TEAL_ACCENT;
+                          e.currentTarget.style.boxShadow = `0 0 0 2px ${colors.TEAL_LIGHT}`;
+                        }}
+                        onBlurCapture={(e) => {
+                          e.currentTarget.style.borderColor = colors.BLUE_95;
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      />
+
+                      {/* Dropdown for stop variables */}
+                      {showStopVarDropdown && stopVarSearch.length >= 2 && (
+                        <div style={{
+                          position: 'absolute',
+                          zIndex: 100,
+                          width: '100%',
+                          marginTop: spacing.xs,
+                          backgroundColor: colors.WHITE,
+                          borderRadius: borderRadius.md,
+                          boxShadow: shadows.xl,
+                          maxHeight: '200px',
+                          overflowY: 'auto',
+                          border: `1px solid ${colors.BLUE_95}`
+                        }}>
+                          {variables
+                            .filter(v =>
+                              (v.name.toLowerCase().includes(stopVarSearch.toLowerCase()) ||
+                              (v.label || '').toLowerCase().includes(stopVarSearch.toLowerCase())) &&
+                              !stopVariables.includes(v.name)
+                            )
+                            .slice(0, 8)
+                            .map(v => (
+                              <div
+                                key={v.name}
+                                onClick={() => {
+                                  if (!stopVariables.includes(v.name)) {
+                                    setStopVariables([...stopVariables, v.name]);
+                                    setStopVarSearch('');
+                                    setShowStopVarDropdown(false);
+                                  }
+                                }}
+                                style={{
+                                  padding: spacing.sm,
+                                  cursor: 'pointer',
+                                  transition: transitions.fast,
+                                  borderBottom: `1px solid ${colors.BLUE_98}`,
+                                  fontSize: typography.fontSize.xs,
+                                  fontFamily: typography.fontFamily.mono
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = colors.TEAL_LIGHT;
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                {v.name}
+                              </div>
+                            ))}
+                          {variables.filter(v =>
+                            (v.name.toLowerCase().includes(stopVarSearch.toLowerCase()) ||
+                            (v.label || '').toLowerCase().includes(stopVarSearch.toLowerCase())) &&
+                            !stopVariables.includes(v.name)
+                          ).length === 0 && (
+                            <div style={{
+                              padding: spacing.sm,
+                              fontSize: typography.fontSize.xs,
+                              color: colors.DARK_GRAY
+                            }}>
+                              No variables found
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Visual Layout Section */}
+                <div style={{ marginBottom: spacing.md }}>
+                  <h4 style={{
+                    fontSize: typography.fontSize.xs,
+                    fontWeight: typography.fontWeight.bold,
+                    marginBottom: spacing.md,
+                    color: colors.BLUE_PRIMARY,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Visual Layout
+                  </h4>
+
+                  {/* Layout Direction */}
+                  <div style={{ marginBottom: spacing.md }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.medium,
+                      marginBottom: spacing.xs,
+                      color: colors.DARKEST_BLUE
+                    }}>
+                      Layout Direction:
+                    </label>
+                    <select
+                      value={layoutDirection}
+                      onChange={(e) => setLayoutDirection(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: spacing.sm,
+                        fontSize: typography.fontSize.sm,
+                        border: `1px solid ${colors.BLUE_95}`,
+                        borderRadius: borderRadius.md,
+                        backgroundColor: colors.WHITE,
+                        color: colors.DARKEST_BLUE,
+                        cursor: 'pointer',
+                        transition: transitions.normal
+                      }}
+                    >
+                      <option value="UD">Top to Bottom (⬇)</option>
+                      <option value="DU">Bottom to Top (⬆)</option>
+                      <option value="LR">Left to Right (➡)</option>
+                      <option value="RL">Right to Left (⬅)</option>
+                    </select>
+                  </div>
+
+                  {/* Node Spacing */}
+                  <div style={{ marginBottom: spacing.md }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.medium,
+                      marginBottom: spacing.sm,
+                      color: colors.DARKEST_BLUE
+                    }}>
+                      Node Spacing: <span style={{ fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>{nodeSpacing}px</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="100"
+                      max="500"
+                      step="50"
+                      value={nodeSpacing}
+                      onChange={(e) => setNodeSpacing(Number(e.target.value))}
+                      style={{
+                        width: '100%',
+                        accentColor: colors.TEAL_ACCENT,
+                        cursor: 'pointer'
+                      }}
+                    />
+                  </div>
+
+                  {/* Level Separation */}
+                  <div style={{ marginBottom: spacing.md }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.medium,
+                      marginBottom: spacing.sm,
+                      color: colors.DARKEST_BLUE
+                    }}>
+                      Level Separation: <span style={{ fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>{levelSeparation}px</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="50"
+                      max="300"
+                      step="25"
+                      value={levelSeparation}
+                      onChange={(e) => setLevelSeparation(Number(e.target.value))}
+                      style={{
+                        width: '100%',
+                        accentColor: colors.TEAL_ACCENT,
+                        cursor: 'pointer'
+                      }}
+                    />
                   </div>
                 </div>
               </div>
