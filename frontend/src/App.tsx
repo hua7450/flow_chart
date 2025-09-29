@@ -1635,7 +1635,7 @@ function App() {
                   </div>
 
                   {/* Edges */}
-                  <div>
+                  <div style={{ marginBottom: spacing.md }}>
                     <p style={{
                       fontSize: typography.fontSize.xs,
                       fontWeight: typography.fontWeight.semibold,
@@ -1663,6 +1663,47 @@ function App() {
                             minWidth: '24px'
                           }}>
                             {item.symbol}
+                          </span>
+                          <span style={{
+                            fontSize: typography.fontSize.xs,
+                            color: colors.DARK_GRAY
+                          }}>
+                            {item.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Interactions */}
+                  <div>
+                    <p style={{
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.sm,
+                      color: colors.DARKEST_BLUE
+                    }}>
+                      Click on Node
+                    </p>
+                    <div style={{ paddingLeft: spacing.md }}>
+                      {[
+                        { icon: '➕', label: 'Add to Stop Variables' },
+                        { icon: '🚫', label: 'Hide Parameters' },
+                        { icon: '📄', label: 'View Source Code' },
+                        { icon: '✨', label: 'Highlight Path' }
+                      ].map((item, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: spacing.sm,
+                          marginBottom: spacing.sm
+                        }}>
+                          <span style={{
+                            fontSize: typography.fontSize.sm,
+                            minWidth: '20px',
+                            textAlign: 'center'
+                          }}>
+                            {item.icon}
                           </span>
                           <span style={{
                             fontSize: typography.fontSize.xs,
