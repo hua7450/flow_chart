@@ -97,12 +97,15 @@ function App() {
   const [showLabels, setShowLabels] = useState<boolean>(true);
   const [showParameters, setShowParameters] = useState<boolean>(true);
   const [paramDetailLevel, setParamDetailLevel] = useState<string>('Summary');
-  const [stopVariables, setStopVariables] = useState<string>('');
+  const [stopVariables, setStopVariables] = useState<string[]>([]);
+  const [stopVarSearch, setStopVarSearch] = useState<string>('');
+  const [showStopVarDropdown, setShowStopVarDropdown] = useState<boolean>(false);
   const [noParamsList, setNoParamsList] = useState<string>('');
 
   const networkContainer = useRef<HTMLDivElement>(null);
   const networkInstance = useRef<Network | null>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const stopVarContainerRef = useRef<HTMLDivElement>(null);
 
   // Load variables on mount and when country changes
   useEffect(() => {
@@ -114,6 +117,9 @@ function App() {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
         setShowSearchResults(false);
+      }
+      if (stopVarContainerRef.current && !stopVarContainerRef.current.contains(event.target as Node)) {
+        setShowStopVarDropdown(false);
       }
     };
 
@@ -182,7 +188,7 @@ function App() {
         showParameters,
         paramDetailLevel,
         showLabels,
-        stopVariables: stopVariables.split('\n').filter(v => v.trim()),
+        stopVariables: stopVariables,
         noParamsList: noParamsList.split('\n').filter(v => v.trim())
       });
 
@@ -599,7 +605,7 @@ function App() {
           <div style={{
             marginBottom: spacing.lg,
             borderRadius: borderRadius.md,
-            overflow: 'hidden',
+            overflow: 'visible',
             backgroundColor: colors.BLUE_98,
             border: `1px solid ${colors.BLUE_95}`
           }}>
@@ -769,22 +775,171 @@ function App() {
                   }}>
                     Stop Variables:
                   </label>
-                  <textarea
-                    value={stopVariables}
-                    onChange={(e) => setStopVariables(e.target.value)}
-                    placeholder="employment_income&#10;self_employment_income&#10;pension_income"
-                    rows={3}
-                    style={{
-                      width: '100%',
+
+                  {/* Selected stop variables as chips */}
+                  {stopVariables.length > 0 && (
+                    <div style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: spacing.xs,
+                      marginBottom: spacing.sm,
                       padding: spacing.sm,
-                      fontSize: typography.fontSize.xs,
-                      borderRadius: borderRadius.md,
-                      border: `1px solid ${colors.BLUE_95}`,
-                      backgroundColor: colors.WHITE,
-                      resize: 'vertical',
-                      fontFamily: typography.fontFamily.mono
-                    }}
-                  />
+                      backgroundColor: colors.BLUE_98,
+                      borderRadius: borderRadius.sm,
+                      border: `1px solid ${colors.BLUE_95}`
+                    }}>
+                      {stopVariables.map((variable, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: spacing.xs,
+                            padding: `${spacing.xs} ${spacing.sm}`,
+                            backgroundColor: colors.BLUE_PRIMARY,
+                            color: colors.WHITE,
+                            borderRadius: borderRadius.sm,
+                            fontSize: typography.fontSize.xs,
+                            fontFamily: typography.fontFamily.mono
+                          }}
+                        >
+                          <span>{variable}</span>
+                          <button
+                            onClick={() => {
+                              setStopVariables(stopVariables.filter((_, i) => i !== idx));
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              padding: '2px',
+                              backgroundColor: 'transparent',
+                              color: colors.WHITE,
+                              border: 'none',
+                              cursor: 'pointer',
+                              borderRadius: borderRadius.sm,
+                              transition: transitions.fast
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <line x1="18" y1="6" x2="6" y2="18"></line>
+                              <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Search input for stop variables */}
+                  <div style={{ position: 'relative' }} ref={stopVarContainerRef}>
+                    <input
+                      type="text"
+                      placeholder="Search to add stop variables..."
+                      value={stopVarSearch}
+                      onChange={(e) => {
+                        setStopVarSearch(e.target.value);
+                        if (e.target.value.length >= 2) {
+                          setShowStopVarDropdown(true);
+                        } else {
+                          setShowStopVarDropdown(false);
+                        }
+                      }}
+                      onFocus={() => {
+                        if (stopVarSearch.length >= 2) setShowStopVarDropdown(true);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: spacing.sm,
+                        fontSize: typography.fontSize.xs,
+                        borderRadius: borderRadius.md,
+                        border: `1px solid ${colors.BLUE_95}`,
+                        backgroundColor: colors.WHITE,
+                        outline: 'none',
+                        transition: transitions.normal,
+                        fontFamily: typography.fontFamily.mono
+                      }}
+                      onFocusCapture={(e) => {
+                        e.currentTarget.style.borderColor = colors.TEAL_ACCENT;
+                        e.currentTarget.style.boxShadow = `0 0 0 2px ${colors.TEAL_LIGHT}`;
+                      }}
+                      onBlurCapture={(e) => {
+                        e.currentTarget.style.borderColor = colors.BLUE_95;
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    />
+
+                    {/* Dropdown for stop variables */}
+                    {showStopVarDropdown && stopVarSearch.length >= 2 && (
+                      <div style={{
+                        position: 'absolute',
+                        zIndex: 100,
+                        width: '100%',
+                        marginTop: spacing.xs,
+                        backgroundColor: colors.WHITE,
+                        borderRadius: borderRadius.md,
+                        boxShadow: shadows.xl,
+                        maxHeight: '200px',
+                        overflowY: 'auto',
+                        border: `1px solid ${colors.BLUE_95}`
+                      }}>
+                        {variables
+                          .filter(v =>
+                            (v.name.toLowerCase().includes(stopVarSearch.toLowerCase()) ||
+                            (v.label || '').toLowerCase().includes(stopVarSearch.toLowerCase())) &&
+                            !stopVariables.includes(v.name)
+                          )
+                          .slice(0, 8)
+                          .map(v => (
+                            <div
+                              key={v.name}
+                              onClick={() => {
+                                if (!stopVariables.includes(v.name)) {
+                                  setStopVariables([...stopVariables, v.name]);
+                                  setStopVarSearch('');
+                                  setShowStopVarDropdown(false);
+                                }
+                              }}
+                              style={{
+                                padding: spacing.sm,
+                                cursor: 'pointer',
+                                transition: transitions.fast,
+                                borderBottom: `1px solid ${colors.BLUE_98}`,
+                                fontSize: typography.fontSize.xs,
+                                fontFamily: typography.fontFamily.mono
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = colors.TEAL_LIGHT;
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }}
+                            >
+                              {v.name}
+                            </div>
+                          ))}
+                        {variables.filter(v =>
+                          (v.name.toLowerCase().includes(stopVarSearch.toLowerCase()) ||
+                          (v.label || '').toLowerCase().includes(stopVarSearch.toLowerCase())) &&
+                          !stopVariables.includes(v.name)
+                        ).length === 0 && (
+                          <div style={{
+                            padding: spacing.sm,
+                            fontSize: typography.fontSize.xs,
+                            color: colors.DARK_GRAY
+                          }}>
+                            No variables found
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
