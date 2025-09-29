@@ -94,18 +94,20 @@ function App() {
   // Controls
   const [maxDepth, setMaxDepth] = useState<number>(10);
   const [expandAddsSubtracts, setExpandAddsSubtracts] = useState<boolean>(true);
-  const [showLabels, setShowLabels] = useState<boolean>(true);
   const [showParameters, setShowParameters] = useState<boolean>(true);
   const [paramDetailLevel, setParamDetailLevel] = useState<string>('Summary');
   const [stopVariables, setStopVariables] = useState<string[]>([]);
   const [stopVarSearch, setStopVarSearch] = useState<string>('');
   const [showStopVarDropdown, setShowStopVarDropdown] = useState<boolean>(false);
-  const [noParamsList, setNoParamsList] = useState<string>('');
+  const [noParamsList, setNoParamsList] = useState<string[]>([]);
+  const [noParamsSearch, setNoParamsSearch] = useState<string>('');
+  const [showNoParamsDropdown, setShowNoParamsDropdown] = useState<boolean>(false);
 
   const networkContainer = useRef<HTMLDivElement>(null);
   const networkInstance = useRef<Network | null>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const stopVarContainerRef = useRef<HTMLDivElement>(null);
+  const noParamsContainerRef = useRef<HTMLDivElement>(null);
 
   // Load variables on mount and when country changes
   useEffect(() => {
@@ -120,6 +122,9 @@ function App() {
       }
       if (stopVarContainerRef.current && !stopVarContainerRef.current.contains(event.target as Node)) {
         setShowStopVarDropdown(false);
+      }
+      if (noParamsContainerRef.current && !noParamsContainerRef.current.contains(event.target as Node)) {
+        setShowNoParamsDropdown(false);
       }
     };
 
@@ -187,9 +192,9 @@ function App() {
         expandAddsSubtracts,
         showParameters,
         paramDetailLevel,
-        showLabels,
+        showLabels: true,
         stopVariables: stopVariables,
-        noParamsList: noParamsList.split('\n').filter(v => v.trim())
+        noParamsList: noParamsList
       });
 
       if (response.data.success) {
@@ -671,7 +676,6 @@ function App() {
                 <div style={{ marginBottom: spacing.md }}>
                   {[
                     { label: 'Expand Adds/Subtracts', checked: expandAddsSubtracts, onChange: setExpandAddsSubtracts },
-                    { label: 'Show Labels', checked: showLabels, onChange: setShowLabels },
                     { label: 'Show Parameters', checked: showParameters, onChange: setShowParameters }
                   ].map((item, idx) => (
                     <label key={idx} style={{
@@ -744,22 +748,171 @@ function App() {
                       }}>
                         Don't Show Parameters For:
                       </label>
-                      <textarea
-                        value={noParamsList}
-                        onChange={(e) => setNoParamsList(e.target.value)}
-                        placeholder="Enter variable names, one per line"
-                        rows={2}
-                        style={{
-                          width: '100%',
+
+                      {/* Selected no-params variables as chips */}
+                      {noParamsList.length > 0 && (
+                        <div style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: spacing.xs,
+                          marginBottom: spacing.sm,
                           padding: spacing.sm,
-                          fontSize: typography.fontSize.xs,
-                          borderRadius: borderRadius.md,
-                          border: `1px solid ${colors.BLUE_95}`,
-                          backgroundColor: colors.WHITE,
-                          resize: 'vertical',
-                          fontFamily: typography.fontFamily.mono
-                        }}
-                      />
+                          backgroundColor: colors.BLUE_98,
+                          borderRadius: borderRadius.sm,
+                          border: `1px solid ${colors.BLUE_95}`
+                        }}>
+                          {noParamsList.map((variable, idx) => (
+                            <div
+                              key={idx}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: spacing.xs,
+                                padding: `${spacing.xs} ${spacing.sm}`,
+                                backgroundColor: colors.TEAL_ACCENT,
+                                color: colors.WHITE,
+                                borderRadius: borderRadius.sm,
+                                fontSize: typography.fontSize.xs,
+                                fontFamily: typography.fontFamily.mono
+                              }}
+                            >
+                              <span>{variable}</span>
+                              <button
+                                onClick={() => {
+                                  setNoParamsList(noParamsList.filter((_, i) => i !== idx));
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: '2px',
+                                  backgroundColor: 'transparent',
+                                  color: colors.WHITE,
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  borderRadius: borderRadius.sm,
+                                  transition: transitions.fast
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Search input for no-params variables */}
+                      <div style={{ position: 'relative' }} ref={noParamsContainerRef}>
+                        <input
+                          type="text"
+                          placeholder="Search to add variables..."
+                          value={noParamsSearch}
+                          onChange={(e) => {
+                            setNoParamsSearch(e.target.value);
+                            if (e.target.value.length >= 2) {
+                              setShowNoParamsDropdown(true);
+                            } else {
+                              setShowNoParamsDropdown(false);
+                            }
+                          }}
+                          onFocus={() => {
+                            if (noParamsSearch.length >= 2) setShowNoParamsDropdown(true);
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: spacing.sm,
+                            fontSize: typography.fontSize.xs,
+                            borderRadius: borderRadius.md,
+                            border: `1px solid ${colors.BLUE_95}`,
+                            backgroundColor: colors.WHITE,
+                            outline: 'none',
+                            transition: transitions.normal,
+                            fontFamily: typography.fontFamily.mono
+                          }}
+                          onFocusCapture={(e) => {
+                            e.currentTarget.style.borderColor = colors.TEAL_ACCENT;
+                            e.currentTarget.style.boxShadow = `0 0 0 2px ${colors.TEAL_LIGHT}`;
+                          }}
+                          onBlurCapture={(e) => {
+                            e.currentTarget.style.borderColor = colors.BLUE_95;
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        />
+
+                        {/* Dropdown for no-params variables */}
+                        {showNoParamsDropdown && noParamsSearch.length >= 2 && (
+                          <div style={{
+                            position: 'absolute',
+                            zIndex: 100,
+                            width: '100%',
+                            marginTop: spacing.xs,
+                            backgroundColor: colors.WHITE,
+                            borderRadius: borderRadius.md,
+                            boxShadow: shadows.xl,
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            border: `1px solid ${colors.BLUE_95}`
+                          }}>
+                            {variables
+                              .filter(v =>
+                                (v.name.toLowerCase().includes(noParamsSearch.toLowerCase()) ||
+                                (v.label || '').toLowerCase().includes(noParamsSearch.toLowerCase())) &&
+                                !noParamsList.includes(v.name)
+                              )
+                              .slice(0, 8)
+                              .map(v => (
+                                <div
+                                  key={v.name}
+                                  onClick={() => {
+                                    if (!noParamsList.includes(v.name)) {
+                                      setNoParamsList([...noParamsList, v.name]);
+                                      setNoParamsSearch('');
+                                      setShowNoParamsDropdown(false);
+                                    }
+                                  }}
+                                  style={{
+                                    padding: spacing.sm,
+                                    cursor: 'pointer',
+                                    transition: transitions.fast,
+                                    borderBottom: `1px solid ${colors.BLUE_98}`,
+                                    fontSize: typography.fontSize.xs,
+                                    fontFamily: typography.fontFamily.mono
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = colors.TEAL_LIGHT;
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                  }}
+                                >
+                                  {v.name}
+                                </div>
+                              ))}
+                            {variables.filter(v =>
+                              (v.name.toLowerCase().includes(noParamsSearch.toLowerCase()) ||
+                              (v.label || '').toLowerCase().includes(noParamsSearch.toLowerCase())) &&
+                              !noParamsList.includes(v.name)
+                            ).length === 0 && (
+                              <div style={{
+                                padding: spacing.sm,
+                                fontSize: typography.fontSize.xs,
+                                color: colors.DARK_GRAY
+                              }}>
+                                No variables found
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </>
                 )}
@@ -1008,70 +1161,6 @@ function App() {
               <span>⚠️</span>
               <div>
                 <strong>Error:</strong> {error}
-              </div>
-            </div>
-          )}
-
-          {/* Graph Stats */}
-          {graphData && (
-            <div style={{
-              marginBottom: spacing.md,
-              padding: spacing.md,
-              borderRadius: borderRadius.md,
-              backgroundColor: colors.TEAL_LIGHT,
-              border: `1px solid ${colors.TEAL_ACCENT}`
-            }}>
-              <div style={{
-                fontSize: typography.fontSize.xs,
-                fontWeight: typography.fontWeight.semibold,
-                marginBottom: spacing.md,
-                color: colors.DARKEST_BLUE
-              }}>
-                Graph Statistics
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing.sm }}>
-                <div style={{
-                  padding: spacing.md,
-                  borderRadius: borderRadius.sm,
-                  textAlign: 'center',
-                  backgroundColor: colors.WHITE,
-                  boxShadow: shadows.sm
-                }}>
-                  <div style={{
-                    color: colors.BLUE_PRIMARY,
-                    fontSize: typography.fontSize.xl,
-                    fontWeight: typography.fontWeight.bold
-                  }}>
-                    {graphData.nodes.length}
-                  </div>
-                  <div style={{
-                    color: colors.DARK_GRAY,
-                    fontSize: typography.fontSize.xs
-                  }}>
-                    Nodes
-                  </div>
-                </div>
-                <div style={{
-                  padding: spacing.md,
-                  borderRadius: borderRadius.sm,
-                  textAlign: 'center',
-                  backgroundColor: colors.WHITE,
-                  boxShadow: shadows.sm
-                }}>
-                  <div style={{
-                    color: colors.TEAL_ACCENT,
-                    fontSize: typography.fontSize.xl,
-                    fontWeight: typography.fontWeight.bold
-                  }}>
-                    {graphData.edges.length}
-                  </div>
-                  <div style={{
-                    color: colors.DARK_GRAY,
-                    fontSize: typography.fontSize.xs
-                  }}>
-                    Edges
-                  </div>
-                </div>
               </div>
             </div>
           )}
