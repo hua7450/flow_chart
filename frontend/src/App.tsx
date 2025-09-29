@@ -3,6 +3,7 @@ import './App.css';
 import { Network } from 'vis-network/standalone';
 import axios from 'axios';
 import PolicyEngineTheme from './theme';
+// Logo removed from app, only used in browser tab
 
 // Types
 interface Variable {
