@@ -279,7 +279,11 @@ function App() {
         zoomView: true,
         dragView: true,
         navigationButtons: false,
-        keyboard: { enabled: false }
+        keyboard: { enabled: false },
+        zoomSpeed: 0.3,
+        hideEdgesOnDrag: false,
+        hideEdgesOnZoom: false,
+        hideNodesOnDrag: false
       }
     };
 
