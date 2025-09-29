@@ -3,6 +3,7 @@ import './App.css';
 import { Network } from 'vis-network/standalone';
 import axios from 'axios';
 import PolicyEngineTheme from './theme';
+// Logo removed from app, only used in browser tab
 
 // Types
 interface Variable {
@@ -34,34 +35,66 @@ interface GraphData {
 }
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5001/api';
+const { colors, spacing, typography, borderRadius, shadows, transitions } = PolicyEngineTheme;
 
 // Icon components
 const SearchIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="11" cy="11" r="8"></circle>
     <path d="m21 21-4.35-4.35"></path>
   </svg>
 );
 
 const ChevronIcon = ({ open }: { open: boolean }) => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-    style={{ transform: open ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }}>
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    style={{
+      transform: open ? 'rotate(180deg)' : 'rotate(0)',
+      transition: transitions.normal
+    }}
+  >
     <polyline points="6 9 12 15 18 9"></polyline>
   </svg>
 );
 
 const ClearIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 );
 
 const LoadingSpinner = () => (
-  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+  <div className="spinner" style={{
+    width: '16px',
+    height: '16px',
+    border: `2px solid ${colors.WHITE}`,
+    borderTopColor: 'transparent',
+    borderRadius: borderRadius.full
+  }}></div>
+);
+
+const FullscreenIcon = ({ isFullscreen }: { isFullscreen: boolean }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    {isFullscreen ? (
+      <>
+        <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
+      </>
+    ) : (
+      <>
+        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+      </>
+    )}
+  </svg>
 );
 
 function App() {
+  // State
   const [variables, setVariables] = useState<Variable[]>([]);
   const [selectedVariable, setSelectedVariable] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -71,25 +104,66 @@ function App() {
   const [error, setError] = useState<string>('');
   const [detailsOpen, setDetailsOpen] = useState<boolean>(false);
   const [selectedCountry, setSelectedCountry] = useState<string>('US');
-  
+  const [legendExpanded, setLegendExpanded] = useState<boolean>(true);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
+  const [highlightedPath, setHighlightedPath] = useState<Set<string>>(new Set());
+
   // Controls
   const [maxDepth, setMaxDepth] = useState<number>(10);
   const [expandAddsSubtracts, setExpandAddsSubtracts] = useState<boolean>(true);
-  const [showLabels, setShowLabels] = useState<boolean>(true);
   const [showParameters, setShowParameters] = useState<boolean>(true);
   const [paramDetailLevel, setParamDetailLevel] = useState<string>('Summary');
-  const [stopVariables, setStopVariables] = useState<string>('');
-  const [noParamsList, setNoParamsList] = useState<string>('');
-  const [legendExpanded, setLegendExpanded] = useState<boolean>(true);
-  
+  const [stopVariables, setStopVariables] = useState<string[]>([]);
+  const [stopVarSearch, setStopVarSearch] = useState<string>('');
+  const [showStopVarDropdown, setShowStopVarDropdown] = useState<boolean>(false);
+  const [noParamsList, setNoParamsList] = useState<string[]>([]);
+  const [noParamsSearch, setNoParamsSearch] = useState<string>('');
+  const [showNoParamsDropdown, setShowNoParamsDropdown] = useState<boolean>(false);
+  const [layoutDirection, setLayoutDirection] = useState<string>('UD'); // UD, DU, LR, RL
+  const [nodeSpacing, setNodeSpacing] = useState<number>(300);
+  const [levelSeparation, setLevelSeparation] = useState<number>(150);
+
   const networkContainer = useRef<HTMLDivElement>(null);
   const networkInstance = useRef<Network | null>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const stopVarContainerRef = useRef<HTMLDivElement>(null);
+  const noParamsContainerRef = useRef<HTMLDivElement>(null);
+  const skipAutoReposition = useRef<boolean>(false);
 
   // Load variables on mount and when country changes
   useEffect(() => {
     loadVariables();
   }, [selectedCountry]);
+
+  // Check URL parameters on mount and auto-load variable
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const variableParam = params.get('variable');
+    const countryParam = params.get('country');
+
+    if (countryParam && (countryParam === 'US' || countryParam === 'UK')) {
+      setSelectedCountry(countryParam);
+    }
+
+    if (variableParam && variables.length > 0 && !selectedVariable) {
+      // Verify variable exists
+      const variableExists = variables.some(v => v.name === variableParam);
+      if (variableExists) {
+        setSelectedVariable(variableParam);
+      }
+    }
+  }, [variables]); // Only run when variables change
+
+  // Generate flowchart when selectedVariable is set from URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const variableParam = params.get('variable');
+
+    if (variableParam && selectedVariable === variableParam && graphData === null) {
+      generateFlowchart();
+    }
+  }, [selectedVariable]); // Run when selectedVariable changes
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -97,6 +171,14 @@ function App() {
       if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
         setShowSearchResults(false);
       }
+      if (stopVarContainerRef.current && !stopVarContainerRef.current.contains(event.target as Node)) {
+        setShowStopVarDropdown(false);
+      }
+      if (noParamsContainerRef.current && !noParamsContainerRef.current.contains(event.target as Node)) {
+        setShowNoParamsDropdown(false);
+      }
+      // Close context menu when clicking anywhere
+      setContextMenu(null);
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -104,6 +186,15 @@ function App() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Keep tooltip hidden while context menu is open
+  useEffect(() => {
+    if (contextMenu) {
+      document.body.classList.add('context-menu-open');
+    } else {
+      document.body.classList.remove('context-menu-open');
+    }
+  }, [contextMenu]);
 
   const loadVariables = async () => {
     try {
@@ -124,7 +215,7 @@ function App() {
       setShowSearchResults(false);
       return;
     }
-    
+
     try {
       const response = await axios.get(`${API_BASE}/search`, {
         params: { q: query, country: selectedCountry }
@@ -143,14 +234,23 @@ function App() {
     setSearchTerm('');
     setShowSearchResults(false);
     setError('');
+    // Clear stop variables and no params list when selecting new variable
+    setStopVariables([]);
+    setNoParamsList([]);
     loadVariables();
   };
 
-  const generateFlowchart = async () => {
+  const generateFlowchart = async (overrideStopVars?: string[], overrideNoParams?: string[]) => {
     if (!selectedVariable) {
       setError('Please select a variable');
       return;
     }
+
+    // Update URL with selected variable and country
+    const url = new URL(window.location.href);
+    url.searchParams.set('variable', selectedVariable);
+    url.searchParams.set('country', selectedCountry);
+    window.history.pushState({}, '', url.toString());
 
     setLoading(true);
     setError('');
@@ -163,9 +263,9 @@ function App() {
         expandAddsSubtracts,
         showParameters,
         paramDetailLevel,
-        showLabels,
-        stopVariables: stopVariables.split('\n').filter(v => v.trim()),
-        noParamsList: noParamsList.split('\n').filter(v => v.trim())
+        showLabels: true,
+        stopVariables: overrideStopVars !== undefined ? overrideStopVars : stopVariables,
+        noParamsList: overrideNoParams !== undefined ? overrideNoParams : noParamsList
       });
 
       if (response.data.success) {
@@ -180,10 +280,139 @@ function App() {
     }
   };
 
+  // Function to find all dependencies flowing into a node (downward dependencies)
+  const findPathToNode = (targetNodeId: string, edges: GraphEdge[]): Set<string> => {
+    const pathNodes = new Set<string>();
+
+    // Build adjacency map (parent -> children) for traversing dependencies
+    const childToParents = new Map<string, string[]>();
+
+    edges.forEach(edge => {
+      if (!childToParents.has(edge.to)) {
+        childToParents.set(edge.to, []);
+      }
+      childToParents.get(edge.to)!.push(edge.from);
+    });
+
+    // BFS from target node going backwards through all dependencies
+    const visited = new Set<string>();
+    const queue: string[] = [targetNodeId];
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      pathNodes.add(current);
+
+      // Get all parents (dependencies) of current node
+      const parents = childToParents.get(current) || [];
+      for (const parent of parents) {
+        if (!visited.has(parent)) {
+          queue.push(parent);
+        }
+      }
+    }
+
+    return pathNodes;
+  };
+
+  const highlightPath = (nodeId: string) => {
+    if (!graphData || !networkInstance.current) return;
+
+    const path = findPathToNode(nodeId, graphData.edges);
+    setHighlightedPath(path);
+
+    // Access internal body property (not in TypeScript types but exists at runtime)
+    const network = networkInstance.current as any;
+
+    // Store highlighting info in the graph data for re-rendering
+    graphData.nodes.forEach(node => {
+      const isInPath = path.has(node.id);
+      const nodeElement = network.body?.nodes[node.id];
+      if (nodeElement && nodeElement.setOptions) {
+        if (!isInPath) {
+          nodeElement.setOptions({
+            opacity: 0.2,
+            color: {
+              background: '#e0e0e0',
+              border: '#999'
+            },
+            font: { color: '#999' }
+          });
+        }
+      }
+    });
+
+    graphData.edges.forEach((edge, idx) => {
+      const isInPath = path.has(edge.from) && path.has(edge.to);
+      const edges = network.body?.edges || {};
+      const edgeId = Object.keys(edges).find(key => {
+        const e = edges[key];
+        return (e.from?.id === edge.from || e.fromId === edge.from) &&
+               (e.to?.id === edge.to || e.toId === edge.to);
+      });
+      const edgeElement = edgeId ? edges[edgeId] : null;
+
+      if (edgeElement && edgeElement.setOptions) {
+        if (isInPath) {
+          edgeElement.setOptions({
+            color: { color: '#2C6496' },
+            width: 4
+          });
+        } else {
+          edgeElement.setOptions({
+            color: { color: '#e0e0e0' },
+            width: 1
+          });
+        }
+      }
+    });
+
+    network.redraw();
+  };
+
+  const clearHighlight = () => {
+    if (!graphData || !networkInstance.current) return;
+
+    setHighlightedPath(new Set());
+
+    const network = networkInstance.current as any;
+
+    // Restore original styles
+    graphData.nodes.forEach(node => {
+      const nodeElement = network.body?.nodes[node.id];
+      if (nodeElement && nodeElement.setOptions) {
+        nodeElement.setOptions({
+          opacity: 1,
+          color: node.color,
+          font: node.font
+        });
+      }
+    });
+
+    graphData.edges.forEach((edge, idx) => {
+      const edges = network.body?.edges || {};
+      const edgeId = Object.keys(edges).find(key => {
+        const e = edges[key];
+        return (e.from?.id === edge.from || e.fromId === edge.from) &&
+               (e.to?.id === edge.to || e.toId === edge.to);
+      });
+      const edgeElement = edgeId ? edges[edgeId] : null;
+
+      if (edgeElement && edgeElement.setOptions) {
+        edgeElement.setOptions({
+          color: edge.color,
+          width: 2
+        });
+      }
+    });
+
+    network.redraw();
+  };
+
   const renderGraph = (data: GraphData) => {
     if (!networkContainer.current) return;
 
-    // Destroy existing network if it exists
     if (networkInstance.current) {
       networkInstance.current.destroy();
     }
@@ -192,20 +421,19 @@ function App() {
       layout: {
         hierarchical: {
           enabled: true,
-          direction: 'UD',
+          direction: layoutDirection,
           sortMethod: 'directed',
-          nodeSpacing: 300,
-          levelSeparation: 150,
+          nodeSpacing: nodeSpacing,
+          levelSeparation: levelSeparation,
           treeSpacing: 200,
-          blockShifting: false,
+          blockShifting: true,
           edgeMinimization: true,
-          parentCentralization: true
+          parentCentralization: true,
+          shakeTowards: 'leaves'
         }
       },
       autoResize: true,
-      physics: {
-        enabled: false
-      },
+      physics: { enabled: false },
       nodes: {
         borderWidth: 2,
         borderWidthSelected: 4,
@@ -214,25 +442,23 @@ function App() {
         heightConstraint: { minimum: 40 },
         font: {
           size: 14,
-          face: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
-          bold: {
-            face: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'
-          }
+          face: typography.fontFamily.sans,
+          bold: { face: typography.fontFamily.sans }
         },
         shape: 'box',
         shadow: {
           enabled: true,
-          color: 'rgba(0,0,0,0.15)',
-          size: 12,
+          color: 'rgba(0,0,0,0.1)',
+          size: 10,
           x: 2,
-          y: 3
+          y: 2
         },
         chosen: {
           node: function(values: any, id: any, selected: any, hovering: any) {
             if (hovering) {
               values.borderWidth = 3;
               values.shadow = true;
-              values.shadowSize = 16;
+              values.shadowSize = 14;
             }
           },
           label: false
@@ -241,79 +467,77 @@ function App() {
       edges: {
         smooth: {
           enabled: true,
-          type: 'cubicBezier',
-          roundness: 0.5
+          type: layoutDirection === 'LR' || layoutDirection === 'RL' ? 'cubicBezier' : 'vertical',
+          roundness: 0.5,
+          forceDirection: layoutDirection === 'UD' || layoutDirection === 'DU' ? 'vertical' : 'horizontal'
         },
         width: 2,
         arrows: {
-          to: {
-            enabled: true,
-            scaleFactor: 1.2
-          }
-        }
+          to: { enabled: true, scaleFactor: 1.2 }
+        },
+        color: {
+          inherit: false
+        },
+        chosen: true
       },
       interaction: {
         hover: true,
-        tooltipDelay: 100,
+        tooltipDelay: 300,
         zoomView: true,
         dragView: true,
-        navigationButtons: false,  // Disabled navigation buttons
-        keyboard: {
-          enabled: false  // Disabled to prevent conflicts with search
-        }
+        navigationButtons: false,
+        keyboard: { enabled: false },
+        zoomSpeed: 0.5,
+        hideEdgesOnDrag: false,
+        hideEdgesOnZoom: false,
+        hideNodesOnDrag: false
       }
     };
 
-    // Create new network
     networkInstance.current = new Network(
       networkContainer.current,
       { nodes: data.nodes, edges: data.edges },
       options
     );
 
-    // After initial render, fix overlapping by ensuring proper spacing
-    setTimeout(() => {
+    const repositionNodes = () => {
       if (!networkInstance.current) return;
-      
+
       const positions = networkInstance.current.getPositions();
       if (!positions) return;
-      
-      // Group nodes by their Y position (level)
+
       const levels: Map<number, string[]> = new Map();
-      
+
       for (const nodeId in positions) {
-        const y = Math.round(positions[nodeId].y / 10) * 10; // Round to nearest 10 for grouping
+        const y = Math.round(positions[nodeId].y / 10) * 10;
         if (!levels.has(y)) {
           levels.set(y, []);
         }
         levels.get(y)!.push(nodeId);
       }
-      
-      // For each level, ensure proper spacing
-      const minSpacing = 180; // Minimum horizontal spacing
-      
+
+      const minSpacing = 180;
+
       levels.forEach((nodesAtLevel) => {
         if (nodesAtLevel.length <= 1) return;
-        
-        // Sort nodes by current X position
+
         nodesAtLevel.sort((a, b) => positions[a].x - positions[b].x);
-        
-        // Calculate total width needed
+
         const totalWidth = (nodesAtLevel.length - 1) * minSpacing;
         const startX = -totalWidth / 2;
-        
-        // Position nodes with equal spacing
+
         nodesAtLevel.forEach((nodeId, index) => {
           const newX = startX + (index * minSpacing);
           networkInstance.current?.moveNode(nodeId, newX, positions[nodeId].y);
         });
       });
-      
-      // Fit the view to show all nodes (without animation to avoid zoom issues)
-      networkInstance.current.fit();
-    }, 100);
 
-    // Add hover effects
+      networkInstance.current.fit();
+    };
+
+    // Call repositioning after a delay to let initial layout settle
+    setTimeout(repositionNodes, 500);
+
     networkInstance.current.on("hoverNode", function () {
       document.body.style.cursor = 'pointer';
     });
@@ -322,181 +546,307 @@ function App() {
       document.body.style.cursor = 'default';
     });
 
-    // Wait for stabilization then fit the entire graph in view
-    networkInstance.current.on("stabilizationIterationsDone", function () {
-      setTimeout(() => {
-        if (networkInstance.current) {
-          // Fit the entire network in the viewport
-          networkInstance.current.fit({
-            animation: {
-              duration: 1000,
-              easingFunction: 'easeInOutQuad'
-            }
-          });
+    // Add context menu on right-click or regular click
+    networkInstance.current.on("oncontext", function (params) {
+      params.event.preventDefault();
+      if (params.nodes.length > 0) {
+        const nodeId = params.nodes[0];
+        const event = params.event.srcEvent || params.event;
+        // Calculate position with offset to avoid covering the node
+        const menuWidth = 200;
+        const menuHeight = 150;
+        let x = event.clientX + 10;
+        let y = event.clientY + 10;
+
+        // Adjust if menu would go off-screen
+        if (x + menuWidth > window.innerWidth) {
+          x = event.clientX - menuWidth - 10;
         }
+        if (y + menuHeight > window.innerHeight) {
+          y = event.clientY - menuHeight - 10;
+        }
+
+        setContextMenu({
+          x: x,
+          y: y,
+          nodeId: nodeId
+        });
+      }
+    });
+
+    // Also add context menu on regular click
+    networkInstance.current.on("click", function (params) {
+      if (params.nodes.length > 0) {
+        const nodeId = params.nodes[0];
+        const event = params.event.srcEvent || params.event;
+
+        // Calculate position with offset to avoid covering the node
+        const menuWidth = 200;
+        const menuHeight = 150;
+        let x = event.clientX + 10;
+        let y = event.clientY + 10;
+
+        // Adjust if menu would go off-screen
+        if (x + menuWidth > window.innerWidth) {
+          x = event.clientX - menuWidth - 10;
+        }
+        if (y + menuHeight > window.innerHeight) {
+          y = event.clientY - menuHeight - 10;
+        }
+
+        setContextMenu({
+          x: x,
+          y: y,
+          nodeId: nodeId
+        });
+      } else {
+        setContextMenu(null);
+        // Clear highlight when clicking on background
+        if (highlightedPath.size > 0) {
+          clearHighlight();
+        }
+      }
+    });
+
+    networkInstance.current.on("stabilizationIterationsDone", function () {
+      // Skip auto-repositioning if we're doing a manual re-layout
+      if (skipAutoReposition.current) {
+        skipAutoReposition.current = false;
+        return;
+      }
+      // Reposition nodes after stabilization completes
+      setTimeout(() => {
+        repositionNodes();
       }, 100);
     });
 
-    // Trigger stabilization
     networkInstance.current.stabilize();
   };
 
-  // Filter variables based on search
   const filteredVariables = searchTerm.length >= 2
-    ? variables.filter(v => 
+    ? variables.filter(v =>
         v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (v.label || '').toLowerCase().includes(searchTerm.toLowerCase())
       )
     : variables;
 
   return (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'row', 
+    <div style={{
+      display: 'flex',
       height: '100vh',
       width: '100vw',
-      backgroundColor: PolicyEngineTheme.colors.BLUE_98,
-      overflow: 'hidden'
+      backgroundColor: colors.BLUE_98,
+      overflow: 'hidden',
+      fontFamily: typography.fontFamily.sans
     }}>
-      {/* Modern Sidebar */}
-      <div style={{ 
+      {/* Sidebar */}
+      <aside style={{
         width: '380px',
         flexShrink: 0,
-        backgroundColor: PolicyEngineTheme.colors.WHITE,
-        borderRight: `2px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-        boxShadow: '4px 0 12px rgba(0,0,0,0.05)',
+        backgroundColor: colors.WHITE,
+        borderRight: `1px solid ${colors.BLUE_95}`,
+        boxShadow: shadows.lg,
         overflowY: 'auto',
-        height: '100vh',
-        marginLeft: '16px'
+        height: '100vh'
       }}>
-        <div style={{ padding: '20px 24px' }}>
-          {/* Header with gradient */}
-          <div className="mb-6" style={{
-            padding: '24px',
-            background: `linear-gradient(135deg, ${PolicyEngineTheme.colors.BLUE_PRIMARY} 0%, ${PolicyEngineTheme.colors.TEAL_ACCENT} 100%)`,
-            borderRadius: '12px',
-            boxShadow: '0 4px 16px rgba(44, 100, 150, 0.3)'
+        <div style={{ padding: spacing.lg }}>
+          {/* Header */}
+          <header style={{
+            padding: spacing.lg,
+            background: `linear-gradient(135deg, ${colors.BLUE_PRIMARY} 0%, ${colors.TEAL_ACCENT} 100%)`,
+            borderRadius: borderRadius.lg,
+            boxShadow: shadows.md,
+            marginBottom: spacing.lg
           }}>
-            <div>
-              <h1 className="text-xl font-bold text-white">
-                PolicyEngine Flowchart
-              </h1>
-              <p className="text-xs mt-1" style={{ color: PolicyEngineTheme.colors.BLUE_98, opacity: 0.95 }}>
-                Visualize variable dependencies
-              </p>
-              
-              {/* Country Selector */}
-              <div className="mt-3">
-                <select 
-                  value={selectedCountry}
-                  onChange={(e) => {
-                    setSelectedCountry(e.target.value);
-                    setSelectedVariable('');
-                    setSearchTerm('');
-                    setError('');
-                    setGraphData(null);
-                  }}
-                  className="px-3 py-1 text-sm rounded-md"
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    color: PolicyEngineTheme.colors.DARKEST_BLUE,
-                    border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="US">🇺🇸 United States</option>
-                  <option value="UK">🇬🇧 United Kingdom</option>
-                </select>
-              </div>
-            </div>
-          </div>
+            <h1 style={{
+              fontSize: typography.fontSize.xl,
+              fontWeight: typography.fontWeight.bold,
+              color: colors.WHITE,
+              margin: 0,
+              marginBottom: spacing.xs
+            }}>
+              PolicyEngine Flowchart
+            </h1>
+            <p style={{
+              fontSize: typography.fontSize.sm,
+              color: colors.BLUE_98,
+              margin: 0,
+              marginBottom: spacing.md,
+              opacity: 0.95
+            }}>
+              Visualize variable dependencies
+            </p>
 
-          {/* Enhanced Search */}
-          <div className="mb-5 relative" ref={searchContainerRef}>
-            <label className="block text-sm font-semibold mb-2" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+            {/* Country Selector */}
+            <select
+              value={selectedCountry}
+              onChange={(e) => {
+                setSelectedCountry(e.target.value);
+                setSelectedVariable('');
+                setSearchTerm('');
+                setError('');
+                setGraphData(null);
+                // Clear URL parameters
+                window.history.pushState({}, '', window.location.pathname);
+              }}
+              style={{
+                width: '100%',
+                padding: spacing.sm,
+                fontSize: typography.fontSize.sm,
+                borderRadius: borderRadius.md,
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                color: colors.DARKEST_BLUE,
+                border: `1px solid ${colors.BLUE_95}`,
+                outline: 'none',
+                cursor: 'pointer',
+                fontWeight: typography.fontWeight.medium,
+                transition: transitions.normal
+              }}
+            >
+              <option value="US">🇺🇸 United States</option>
+              <option value="UK">🇬🇧 United Kingdom</option>
+            </select>
+          </header>
+
+          {/* Search Section */}
+          <section style={{ marginBottom: spacing.lg, position: 'relative' }} ref={searchContainerRef}>
+            <label style={{
+              display: 'block',
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.semibold,
+              marginBottom: spacing.sm,
+              color: colors.DARKEST_BLUE
+            }}>
               Search Variables
             </label>
-            <div className="relative">
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" 
-                   style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
+            <div style={{ position: 'relative' }}>
+              <div style={{
+                position: 'absolute',
+                left: spacing.md,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: colors.DARK_GRAY,
+                pointerEvents: 'none'
+              }}>
                 <SearchIcon />
               </div>
               <input
                 type="text"
-                className="w-full pl-10 pr-3 py-3 text-sm rounded-lg focus:outline-none transition-all"
-                style={{
-                  border: `2px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-                  backgroundColor: PolicyEngineTheme.colors.WHITE,
-                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)'
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = PolicyEngineTheme.colors.TEAL_ACCENT;
-                  e.currentTarget.style.boxShadow = `0 0 0 3px ${PolicyEngineTheme.colors.TEAL_LIGHT}`;
-                  if (searchTerm.length >= 2) setShowSearchResults(true);
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = PolicyEngineTheme.colors.BLUE_95;
-                  e.currentTarget.style.boxShadow = 'inset 0 1px 3px rgba(0,0,0,0.05)';
-                }}
-                placeholder="Type variable name (e.g., household_income)..."
+                placeholder="Type variable name..."
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
                   searchVariables(e.target.value);
                 }}
+                onFocus={() => {
+                  if (searchTerm.length >= 2) setShowSearchResults(true);
+                }}
+                style={{
+                  width: '100%',
+                  height: '44px',
+                  paddingLeft: '44px',
+                  paddingRight: spacing.md,
+                  fontSize: typography.fontSize.base,
+                  border: `2px solid ${colors.BLUE_95}`,
+                  borderRadius: borderRadius.md,
+                  backgroundColor: colors.WHITE,
+                  outline: 'none',
+                  transition: transitions.normal,
+                  boxShadow: shadows.sm
+                }}
+                onFocusCapture={(e) => {
+                  e.currentTarget.style.borderColor = colors.TEAL_ACCENT;
+                  e.currentTarget.style.boxShadow = `0 0 0 3px ${colors.TEAL_LIGHT}`;
+                }}
+                onBlurCapture={(e) => {
+                  e.currentTarget.style.borderColor = colors.BLUE_95;
+                  e.currentTarget.style.boxShadow = shadows.sm;
+                }}
               />
-            </div>
-            
-            {/* Enhanced Dropdown */}
-            {showSearchResults && searchTerm.length >= 2 && (
-              <div className="absolute z-10 w-full mt-2 bg-white rounded-lg shadow-xl max-h-64 overflow-y-auto" style={{
-                border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`
-              }}>
-                {filteredVariables.slice(0, 5).map(v => (
+
+              {/* Dropdown */}
+              {showSearchResults && searchTerm.length >= 2 && (
+                <div style={{
+                  position: 'absolute',
+                  zIndex: 10,
+                  width: '100%',
+                  marginTop: spacing.sm,
+                  backgroundColor: colors.WHITE,
+                  borderRadius: borderRadius.md,
+                  boxShadow: shadows.xl,
+                  maxHeight: '320px',
+                  overflowY: 'auto',
+                  border: `1px solid ${colors.BLUE_95}`
+                }}>
+                {filteredVariables.slice(0, 10).map(v => (
                   <div
                     key={v.name}
-                    className="px-4 py-3 cursor-pointer transition-all text-sm"
-                    style={{
-                      borderBottom: `1px solid ${PolicyEngineTheme.colors.BLUE_98}`
-                    }}
                     onClick={() => selectVariable(v.name)}
+                    style={{
+                      padding: `${spacing.md} ${spacing.md}`,
+                      cursor: 'pointer',
+                      transition: transitions.fast,
+                      borderBottom: `1px solid ${colors.BLUE_98}`,
+                      fontSize: typography.fontSize.sm
+                    }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = PolicyEngineTheme.colors.TEAL_LIGHT;
-                      e.currentTarget.style.paddingLeft = '20px';
+                      e.currentTarget.style.backgroundColor = colors.TEAL_LIGHT;
+                      e.currentTarget.style.paddingLeft = spacing.lg;
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.paddingLeft = '16px';
+                      e.currentTarget.style.paddingLeft = spacing.md;
                     }}
                   >
-                    <div className="font-mono font-semibold" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+                    <div style={{
+                      fontFamily: typography.fontFamily.mono,
+                      fontWeight: typography.fontWeight.semibold,
+                      color: colors.DARKEST_BLUE,
+                      fontSize: typography.fontSize.sm
+                    }}>
                       {v.name}
                     </div>
                   </div>
                 ))}
                 {filteredVariables.length === 0 && (
-                  <div className="px-4 py-3 text-sm" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
+                  <div style={{
+                    padding: spacing.md,
+                    fontSize: typography.fontSize.sm,
+                    color: colors.DARK_GRAY
+                  }}>
                     No variables found matching "{searchTerm}"
                   </div>
                 )}
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
+          </section>
 
-          {/* Selected Variable Card */}
+          {/* Selected Variable */}
           {selectedVariable && (
-            <div className="mb-5 p-4 rounded-lg" style={{
-              backgroundColor: PolicyEngineTheme.colors.TEAL_LIGHT,
-              border: `2px solid ${PolicyEngineTheme.colors.TEAL_ACCENT}`,
-              animation: 'slideIn 0.3s ease-out'
+            <div style={{
+              marginBottom: spacing.lg,
+              padding: spacing.md,
+              borderRadius: borderRadius.md,
+              backgroundColor: colors.TEAL_LIGHT,
+              border: `2px solid ${colors.TEAL_ACCENT}`
             }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-medium mb-1" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontSize: typography.fontSize.xs,
+                    fontWeight: typography.fontWeight.medium,
+                    marginBottom: spacing.xs,
+                    color: colors.DARK_GRAY
+                  }}>
                     Selected Variable ({selectedCountry})
                   </div>
-                  <div className="font-mono text-sm font-bold" style={{ color: PolicyEngineTheme.colors.TEAL_PRESSED }}>
+                  <div style={{
+                    fontFamily: typography.fontFamily.mono,
+                    fontSize: typography.fontSize.sm,
+                    fontWeight: typography.fontWeight.bold,
+                    color: colors.TEAL_PRESSED
+                  }}>
                     {selectedVariable}
                   </div>
                 </div>
@@ -504,21 +854,30 @@ function App() {
                   onClick={() => {
                     setSelectedVariable('');
                     setSearchTerm('');
-                    loadVariables();
+                    setGraphData(null);
+                    setError('');
+                    // Clear URL parameters
+                    window.history.pushState({}, '', window.location.pathname);
                   }}
-                  className="p-2 rounded-md transition-all hover:scale-110"
-                  style={{ 
-                    color: PolicyEngineTheme.colors.TEAL_PRESSED,
-                    backgroundColor: PolicyEngineTheme.colors.WHITE,
-                    border: `1px solid ${PolicyEngineTheme.colors.TEAL_ACCENT}`
+                  style={{
+                    padding: spacing.sm,
+                    borderRadius: borderRadius.md,
+                    color: colors.TEAL_PRESSED,
+                    backgroundColor: colors.WHITE,
+                    border: `1px solid ${colors.TEAL_ACCENT}`,
+                    cursor: 'pointer',
+                    transition: transitions.normal,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = PolicyEngineTheme.colors.TEAL_ACCENT;
-                    e.currentTarget.style.color = PolicyEngineTheme.colors.WHITE;
+                    e.currentTarget.style.backgroundColor = colors.TEAL_ACCENT;
+                    e.currentTarget.style.color = colors.WHITE;
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = PolicyEngineTheme.colors.WHITE;
-                    e.currentTarget.style.color = PolicyEngineTheme.colors.TEAL_PRESSED;
+                    e.currentTarget.style.backgroundColor = colors.WHITE;
+                    e.currentTarget.style.color = colors.TEAL_PRESSED;
                   }}
                 >
                   <ClearIcon />
@@ -527,173 +886,688 @@ function App() {
             </div>
           )}
 
-          {/* Advanced Options with better styling */}
-          <div className="mb-5 rounded-lg overflow-hidden" style={{
-            backgroundColor: PolicyEngineTheme.colors.BLUE_98,
-            border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`
+          {/* Advanced Options */}
+          <div style={{
+            marginBottom: spacing.lg,
+            borderRadius: borderRadius.md,
+            overflow: 'visible',
+            backgroundColor: colors.BLUE_98,
+            border: `1px solid ${colors.BLUE_95}`
           }}>
             <button
               onClick={() => setDetailsOpen(!detailsOpen)}
-              className="w-full px-4 py-3 text-sm font-semibold flex items-center justify-between transition-all"
-              style={{ 
-                color: PolicyEngineTheme.colors.DARKEST_BLUE,
-                backgroundColor: detailsOpen ? PolicyEngineTheme.colors.BLUE_95 : 'transparent'
+              style={{
+                width: '100%',
+                padding: spacing.md,
+                fontSize: typography.fontSize.sm,
+                fontWeight: typography.fontWeight.semibold,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                color: colors.DARKEST_BLUE,
+                backgroundColor: detailsOpen ? colors.BLUE_95 : 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                transition: transitions.normal
               }}
             >
               <span>⚙️ Advanced Options</span>
               <ChevronIcon open={detailsOpen} />
             </button>
-            
+
             {detailsOpen && (
-              <div className="p-4 space-y-4" style={{ animation: 'slideDown 0.2s ease-out' }}>
-                {/* Max Depth with visual indicator */}
-                <div>
-                  <label className="block text-xs font-medium mb-2" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                    Max Depth: <span className="font-bold text-sm">{maxDepth}</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="20"
-                    value={maxDepth}
-                    onChange={(e) => setMaxDepth(Number(e.target.value))}
-                    className="w-full"
-                    style={{ accentColor: PolicyEngineTheme.colors.TEAL_ACCENT }}
-                  />
-                  <div className="flex justify-between text-xs mt-1" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
-                    <span>1</span>
-                    <span>20</span>
+              <div style={{ padding: spacing.md }}>
+                {/* Graph Content Section */}
+                <div style={{
+                  marginBottom: spacing.lg,
+                  paddingBottom: spacing.md,
+                  borderBottom: `2px solid ${colors.BLUE_95}`
+                }}>
+                  <h4 style={{
+                    fontSize: typography.fontSize.xs,
+                    fontWeight: typography.fontWeight.bold,
+                    marginBottom: spacing.md,
+                    color: colors.BLUE_PRIMARY,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Graph Content
+                  </h4>
+
+                  {/* Max Depth */}
+                  <div style={{ marginBottom: spacing.md }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.medium,
+                      marginBottom: spacing.sm,
+                      color: colors.DARKEST_BLUE
+                    }}>
+                      Max Depth: <span style={{ fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>{maxDepth}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="20"
+                      value={maxDepth}
+                      onChange={(e) => setMaxDepth(Number(e.target.value))}
+                      style={{
+                        width: '100%',
+                        accentColor: colors.TEAL_ACCENT,
+                        cursor: 'pointer'
+                      }}
+                    />
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: typography.fontSize.xs,
+                      marginTop: spacing.xs,
+                      color: colors.DARK_GRAY
+                    }}>
+                      <span>1</span>
+                      <span>20</span>
+                    </div>
+                  </div>
+
+                  {/* Checkboxes */}
+                  <div style={{ marginBottom: spacing.md }}>
+                    {[
+                      { label: 'Expand Adds/Subtracts', checked: expandAddsSubtracts, onChange: setExpandAddsSubtracts },
+                      { label: 'Show Parameters', checked: showParameters, onChange: setShowParameters }
+                    ].map((item, idx) => (
+                      <label key={idx} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        fontSize: typography.fontSize.xs,
+                        cursor: 'pointer',
+                        padding: spacing.sm,
+                        borderRadius: borderRadius.sm,
+                        transition: transitions.fast,
+                        marginBottom: spacing.xs
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.WHITE}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.checked}
+                          onChange={(e) => item.onChange(e.target.checked)}
+                          style={{
+                            marginRight: spacing.sm,
+                            accentColor: colors.TEAL_ACCENT,
+                            cursor: 'pointer'
+                          }}
+                        />
+                        <span style={{ color: colors.DARKEST_BLUE }}>{item.label}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  {/* Parameter Options */}
+                  {showParameters && (
+                    <>
+                      <div style={{ marginBottom: spacing.md }}>
+                        <label style={{
+                          display: 'block',
+                          fontSize: typography.fontSize.xs,
+                          fontWeight: typography.fontWeight.medium,
+                          marginBottom: spacing.xs,
+                          color: colors.DARKEST_BLUE
+                        }}>
+                          Parameter Detail Level
+                        </label>
+                        <select
+                          value={paramDetailLevel}
+                          onChange={(e) => setParamDetailLevel(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: spacing.sm,
+                            fontSize: typography.fontSize.xs,
+                            borderRadius: borderRadius.md,
+                            border: `1px solid ${colors.BLUE_95}`,
+                            backgroundColor: colors.WHITE,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value="Minimal">Minimal</option>
+                          <option value="Summary">Summary</option>
+                          <option value="Full">Full</option>
+                        </select>
+                      </div>
+
+                      <div style={{ marginBottom: spacing.md }}>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: spacing.xs
+                        }}>
+                          <label style={{
+                            fontSize: typography.fontSize.xs,
+                            fontWeight: typography.fontWeight.medium,
+                            color: colors.DARKEST_BLUE
+                          }}>
+                            Don't Show Parameters For:
+                          </label>
+                          {noParamsList.length > 0 && (
+                            <button
+                              onClick={() => setNoParamsList([])}
+                              style={{
+                                fontSize: typography.fontSize.xs,
+                                color: colors.TEAL_PRESSED,
+                                backgroundColor: 'transparent',
+                                padding: spacing.xs,
+                                cursor: 'pointer',
+                                textDecoration: 'underline'
+                              }}
+                            >
+                              Clear all
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Selected no-params variables as chips */}
+                        {noParamsList.length > 0 && (
+                          <div style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: spacing.xs,
+                            marginBottom: spacing.sm,
+                            padding: spacing.sm,
+                            backgroundColor: colors.BLUE_98,
+                            borderRadius: borderRadius.sm,
+                            border: `1px solid ${colors.BLUE_95}`
+                          }}>
+                            {noParamsList.map((variable, idx) => (
+                              <div
+                                key={idx}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: spacing.xs,
+                                  padding: `${spacing.xs} ${spacing.sm}`,
+                                  backgroundColor: colors.TEAL_ACCENT,
+                                  color: colors.WHITE,
+                                  borderRadius: borderRadius.sm,
+                                  fontSize: typography.fontSize.xs,
+                                  fontFamily: typography.fontFamily.mono
+                                }}
+                              >
+                                <span>{variable}</span>
+                                <button
+                                  onClick={() => {
+                                    setNoParamsList(noParamsList.filter((_, i) => i !== idx));
+                                  }}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    padding: '2px',
+                                    backgroundColor: 'transparent',
+                                    color: colors.WHITE,
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    borderRadius: borderRadius.sm,
+                                    transition: transitions.fast
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                  }}
+                                >
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                  </svg>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Search input for no-params variables */}
+                        <div style={{ position: 'relative' }} ref={noParamsContainerRef}>
+                          <input
+                            type="text"
+                            placeholder="Search to add variables..."
+                            value={noParamsSearch}
+                            onChange={(e) => {
+                              setNoParamsSearch(e.target.value);
+                              if (e.target.value.length >= 2) {
+                                setShowNoParamsDropdown(true);
+                              } else {
+                                setShowNoParamsDropdown(false);
+                              }
+                            }}
+                            onFocus={() => {
+                              if (noParamsSearch.length >= 2) setShowNoParamsDropdown(true);
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: spacing.sm,
+                              fontSize: typography.fontSize.xs,
+                              borderRadius: borderRadius.md,
+                              border: `1px solid ${colors.BLUE_95}`,
+                              backgroundColor: colors.WHITE,
+                              outline: 'none',
+                              transition: transitions.normal,
+                              fontFamily: typography.fontFamily.mono
+                            }}
+                            onFocusCapture={(e) => {
+                              e.currentTarget.style.borderColor = colors.TEAL_ACCENT;
+                              e.currentTarget.style.boxShadow = `0 0 0 2px ${colors.TEAL_LIGHT}`;
+                            }}
+                            onBlurCapture={(e) => {
+                              e.currentTarget.style.borderColor = colors.BLUE_95;
+                              e.currentTarget.style.boxShadow = 'none';
+                            }}
+                          />
+
+                          {/* Dropdown for no-params variables */}
+                          {showNoParamsDropdown && noParamsSearch.length >= 2 && (
+                            <div style={{
+                              position: 'absolute',
+                              zIndex: 100,
+                              width: '100%',
+                              marginTop: spacing.xs,
+                              backgroundColor: colors.WHITE,
+                              borderRadius: borderRadius.md,
+                              boxShadow: shadows.xl,
+                              maxHeight: '200px',
+                              overflowY: 'auto',
+                              border: `1px solid ${colors.BLUE_95}`
+                            }}>
+                              {variables
+                                .filter(v =>
+                                  (v.name.toLowerCase().includes(noParamsSearch.toLowerCase()) ||
+                                  (v.label || '').toLowerCase().includes(noParamsSearch.toLowerCase())) &&
+                                  !noParamsList.includes(v.name)
+                                )
+                                .slice(0, 8)
+                                .map(v => (
+                                  <div
+                                    key={v.name}
+                                    onClick={() => {
+                                      if (!noParamsList.includes(v.name)) {
+                                        setNoParamsList([...noParamsList, v.name]);
+                                        setNoParamsSearch('');
+                                        setShowNoParamsDropdown(false);
+                                      }
+                                    }}
+                                    style={{
+                                      padding: spacing.sm,
+                                      cursor: 'pointer',
+                                      transition: transitions.fast,
+                                      borderBottom: `1px solid ${colors.BLUE_98}`,
+                                      fontSize: typography.fontSize.xs,
+                                      fontFamily: typography.fontFamily.mono
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.backgroundColor = colors.TEAL_LIGHT;
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'transparent';
+                                    }}
+                                  >
+                                    {v.name}
+                                  </div>
+                                ))}
+                              {variables.filter(v =>
+                                (v.name.toLowerCase().includes(noParamsSearch.toLowerCase()) ||
+                                (v.label || '').toLowerCase().includes(noParamsSearch.toLowerCase())) &&
+                                !noParamsList.includes(v.name)
+                              ).length === 0 && (
+                                <div style={{
+                                  padding: spacing.sm,
+                                  fontSize: typography.fontSize.xs,
+                                  color: colors.DARK_GRAY
+                                }}>
+                                  No variables found
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Stop Variables */}
+                  <div>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: spacing.xs
+                    }}>
+                      <label style={{
+                        fontSize: typography.fontSize.xs,
+                        fontWeight: typography.fontWeight.medium,
+                        color: colors.DARKEST_BLUE
+                      }}>
+                        Stop Variables:
+                      </label>
+                      {stopVariables.length > 0 && (
+                        <button
+                          onClick={() => setStopVariables([])}
+                          style={{
+                            fontSize: typography.fontSize.xs,
+                            color: colors.TEAL_PRESSED,
+                            backgroundColor: 'transparent',
+                            padding: spacing.xs,
+                            cursor: 'pointer',
+                            textDecoration: 'underline'
+                          }}
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Selected stop variables as chips */}
+                    {stopVariables.length > 0 && (
+                      <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: spacing.xs,
+                        marginBottom: spacing.sm,
+                        padding: spacing.sm,
+                        backgroundColor: colors.BLUE_98,
+                        borderRadius: borderRadius.sm,
+                        border: `1px solid ${colors.BLUE_95}`
+                      }}>
+                        {stopVariables.map((variable, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: spacing.xs,
+                              padding: `${spacing.xs} ${spacing.sm}`,
+                              backgroundColor: colors.BLUE_PRIMARY,
+                              color: colors.WHITE,
+                              borderRadius: borderRadius.sm,
+                              fontSize: typography.fontSize.xs,
+                              fontFamily: typography.fontFamily.mono
+                            }}
+                          >
+                            <span>{variable}</span>
+                            <button
+                              onClick={() => {
+                                setStopVariables(stopVariables.filter((_, i) => i !== idx));
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '2px',
+                                backgroundColor: 'transparent',
+                                color: colors.WHITE,
+                                border: 'none',
+                                cursor: 'pointer',
+                                borderRadius: borderRadius.sm,
+                                transition: transitions.fast
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                              }}
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Search input for stop variables */}
+                    <div style={{ position: 'relative' }} ref={stopVarContainerRef}>
+                      <input
+                        type="text"
+                        placeholder="Search to add stop variables..."
+                        value={stopVarSearch}
+                        onChange={(e) => {
+                          setStopVarSearch(e.target.value);
+                          if (e.target.value.length >= 2) {
+                            setShowStopVarDropdown(true);
+                          } else {
+                            setShowStopVarDropdown(false);
+                          }
+                        }}
+                        onFocus={() => {
+                          if (stopVarSearch.length >= 2) setShowStopVarDropdown(true);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: spacing.sm,
+                          fontSize: typography.fontSize.xs,
+                          borderRadius: borderRadius.md,
+                          border: `1px solid ${colors.BLUE_95}`,
+                          backgroundColor: colors.WHITE,
+                          outline: 'none',
+                          transition: transitions.normal,
+                          fontFamily: typography.fontFamily.mono
+                        }}
+                        onFocusCapture={(e) => {
+                          e.currentTarget.style.borderColor = colors.TEAL_ACCENT;
+                          e.currentTarget.style.boxShadow = `0 0 0 2px ${colors.TEAL_LIGHT}`;
+                        }}
+                        onBlurCapture={(e) => {
+                          e.currentTarget.style.borderColor = colors.BLUE_95;
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      />
+
+                      {/* Dropdown for stop variables */}
+                      {showStopVarDropdown && stopVarSearch.length >= 2 && (
+                        <div style={{
+                          position: 'absolute',
+                          zIndex: 100,
+                          width: '100%',
+                          marginTop: spacing.xs,
+                          backgroundColor: colors.WHITE,
+                          borderRadius: borderRadius.md,
+                          boxShadow: shadows.xl,
+                          maxHeight: '200px',
+                          overflowY: 'auto',
+                          border: `1px solid ${colors.BLUE_95}`
+                        }}>
+                          {variables
+                            .filter(v =>
+                              (v.name.toLowerCase().includes(stopVarSearch.toLowerCase()) ||
+                              (v.label || '').toLowerCase().includes(stopVarSearch.toLowerCase())) &&
+                              !stopVariables.includes(v.name)
+                            )
+                            .slice(0, 8)
+                            .map(v => (
+                              <div
+                                key={v.name}
+                                onClick={() => {
+                                  if (!stopVariables.includes(v.name)) {
+                                    setStopVariables([...stopVariables, v.name]);
+                                    setStopVarSearch('');
+                                    setShowStopVarDropdown(false);
+                                  }
+                                }}
+                                style={{
+                                  padding: spacing.sm,
+                                  cursor: 'pointer',
+                                  transition: transitions.fast,
+                                  borderBottom: `1px solid ${colors.BLUE_98}`,
+                                  fontSize: typography.fontSize.xs,
+                                  fontFamily: typography.fontFamily.mono
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = colors.TEAL_LIGHT;
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                {v.name}
+                              </div>
+                            ))}
+                          {variables.filter(v =>
+                            (v.name.toLowerCase().includes(stopVarSearch.toLowerCase()) ||
+                            (v.label || '').toLowerCase().includes(stopVarSearch.toLowerCase())) &&
+                            !stopVariables.includes(v.name)
+                          ).length === 0 && (
+                            <div style={{
+                              padding: spacing.sm,
+                              fontSize: typography.fontSize.xs,
+                              color: colors.DARK_GRAY
+                            }}>
+                              No variables found
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Styled Checkboxes */}
-                <div className="space-y-2">
-                  <label className="flex items-center text-xs cursor-pointer p-2 rounded hover:bg-white transition-colors">
+                {/* Visual Layout Section */}
+                <div style={{ marginBottom: spacing.md }}>
+                  <h4 style={{
+                    fontSize: typography.fontSize.xs,
+                    fontWeight: typography.fontWeight.bold,
+                    marginBottom: spacing.md,
+                    color: colors.BLUE_PRIMARY,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Visual Layout
+                  </h4>
+
+                  {/* Layout Direction */}
+                  <div style={{ marginBottom: spacing.md }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.medium,
+                      marginBottom: spacing.xs,
+                      color: colors.DARKEST_BLUE
+                    }}>
+                      Layout Direction:
+                    </label>
+                    <select
+                      value={layoutDirection}
+                      onChange={(e) => setLayoutDirection(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: spacing.sm,
+                        fontSize: typography.fontSize.sm,
+                        border: `1px solid ${colors.BLUE_95}`,
+                        borderRadius: borderRadius.md,
+                        backgroundColor: colors.WHITE,
+                        color: colors.DARKEST_BLUE,
+                        cursor: 'pointer',
+                        transition: transitions.normal
+                      }}
+                    >
+                      <option value="UD">Top to Bottom (⬇)</option>
+                      <option value="DU">Bottom to Top (⬆)</option>
+                      <option value="LR">Left to Right (➡)</option>
+                      <option value="RL">Right to Left (⬅)</option>
+                    </select>
+                  </div>
+
+                  {/* Node Spacing */}
+                  <div style={{ marginBottom: spacing.md }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.medium,
+                      marginBottom: spacing.sm,
+                      color: colors.DARKEST_BLUE
+                    }}>
+                      Node Spacing: <span style={{ fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>{nodeSpacing}px</span>
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={expandAddsSubtracts}
-                      onChange={(e) => setExpandAddsSubtracts(e.target.checked)}
-                      className="mr-2"
-                      style={{ accentColor: PolicyEngineTheme.colors.TEAL_ACCENT }}
+                      type="range"
+                      min="100"
+                      max="500"
+                      step="50"
+                      value={nodeSpacing}
+                      onChange={(e) => setNodeSpacing(Number(e.target.value))}
+                      style={{
+                        width: '100%',
+                        accentColor: colors.TEAL_ACCENT,
+                        cursor: 'pointer'
+                      }}
                     />
-                    <span style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                      Expand Adds/Subtracts
-                    </span>
-                  </label>
+                  </div>
 
-                  <label className="flex items-center text-xs cursor-pointer p-2 rounded hover:bg-white transition-colors">
+                  {/* Level Separation */}
+                  <div style={{ marginBottom: spacing.md }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.medium,
+                      marginBottom: spacing.sm,
+                      color: colors.DARKEST_BLUE
+                    }}>
+                      Level Separation: <span style={{ fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>{levelSeparation}px</span>
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={showLabels}
-                      onChange={(e) => setShowLabels(e.target.checked)}
-                      className="mr-2"
-                      style={{ accentColor: PolicyEngineTheme.colors.TEAL_ACCENT }}
+                      type="range"
+                      min="50"
+                      max="300"
+                      step="25"
+                      value={levelSeparation}
+                      onChange={(e) => setLevelSeparation(Number(e.target.value))}
+                      style={{
+                        width: '100%',
+                        accentColor: colors.TEAL_ACCENT,
+                        cursor: 'pointer'
+                      }}
                     />
-                    <span style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                      Show Labels
-                    </span>
-                  </label>
-
-                  <label className="flex items-center text-xs cursor-pointer p-2 rounded hover:bg-white transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={showParameters}
-                      onChange={(e) => setShowParameters(e.target.checked)}
-                      className="mr-2"
-                      style={{ accentColor: PolicyEngineTheme.colors.TEAL_ACCENT }}
-                    />
-                    <span style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                      Show Parameters
-                    </span>
-                  </label>
-                </div>
-
-                {/* Parameter Options */}
-                {showParameters && (
-                  <>
-                    <div>
-                      <label className="block text-xs font-medium mb-1" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                        Parameter Detail Level
-                      </label>
-                      <select
-                        value={paramDetailLevel}
-                        onChange={(e) => setParamDetailLevel(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-md"
-                        style={{
-                          border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-                          backgroundColor: PolicyEngineTheme.colors.WHITE
-                        }}
-                      >
-                        <option value="Minimal">Minimal</option>
-                        <option value="Summary">Summary</option>
-                        <option value="Full">Full</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium mb-1" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                        Don't Show Parameters For:
-                      </label>
-                      <textarea
-                        className="w-full px-3 py-2 text-xs rounded-md"
-                        style={{
-                          border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-                          backgroundColor: PolicyEngineTheme.colors.WHITE,
-                          resize: 'vertical'
-                        }}
-                        rows={2}
-                        placeholder="Enter variable names, one per line"
-                        value={noParamsList}
-                        onChange={(e) => setNoParamsList(e.target.value)}
-                      />
-                    </div>
-                  </>
-                )}
-
-                {/* Stop Variables */}
-                <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                    Stop Variables (optional):
-                  </label>
-                  <textarea
-                    className="w-full px-3 py-2 text-xs rounded-md"
-                    style={{
-                      border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-                      backgroundColor: PolicyEngineTheme.colors.WHITE,
-                      resize: 'vertical'
-                    }}
-                    rows={3}
-                    placeholder="employment_income&#10;self_employment_income&#10;pension_income"
-                    value={stopVariables}
-                    onChange={(e) => setStopVariables(e.target.value)}
-                  />
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Enhanced Generate Button */}
+          {/* Generate Button */}
           <button
-            onClick={generateFlowchart}
+            onClick={() => generateFlowchart()}
             disabled={loading || !selectedVariable}
-            className="w-full py-3 px-4 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2"
-            style={{ 
-              backgroundColor: loading || !selectedVariable ? PolicyEngineTheme.colors.MEDIUM_LIGHT_GRAY : PolicyEngineTheme.colors.BLUE_PRIMARY,
-              color: PolicyEngineTheme.colors.WHITE,
-              boxShadow: loading || !selectedVariable ? 'none' : '0 4px 12px rgba(44, 100, 150, 0.4)',
-              transform: 'translateY(0)',
-              cursor: loading || !selectedVariable ? 'not-allowed' : 'pointer'
+            style={{
+              width: '100%',
+              height: '48px',
+              padding: spacing.md,
+              borderRadius: borderRadius.md,
+              fontSize: typography.fontSize.base,
+              fontWeight: typography.fontWeight.semibold,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: spacing.sm,
+              backgroundColor: loading || !selectedVariable ? colors.MEDIUM_LIGHT_GRAY : colors.BLUE_PRIMARY,
+              color: colors.WHITE,
+              border: 'none',
+              boxShadow: loading || !selectedVariable ? 'none' : shadows.md,
+              cursor: loading || !selectedVariable ? 'not-allowed' : 'pointer',
+              transition: transitions.normal,
+              marginBottom: spacing.md
             }}
             onMouseEnter={(e) => {
               if (!loading && selectedVariable) {
                 e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(44, 100, 150, 0.5)';
+                e.currentTarget.style.boxShadow = shadows.lg;
               }
             }}
             onMouseLeave={(e) => {
               if (!loading && selectedVariable) {
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(44, 100, 150, 0.4)';
+                e.currentTarget.style.boxShadow = shadows.md;
               }
             }}
           >
@@ -709,10 +1583,17 @@ function App() {
 
           {/* Error Display */}
           {error && (
-            <div className="mt-4 p-3 rounded-lg text-xs flex items-start gap-2" style={{
+            <div style={{
+              marginBottom: spacing.md,
+              padding: spacing.md,
+              borderRadius: borderRadius.md,
+              fontSize: typography.fontSize.xs,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: spacing.sm,
               backgroundColor: '#FEF2F2',
-              border: `1px solid ${PolicyEngineTheme.colors.DARK_RED}`,
-              color: PolicyEngineTheme.colors.DARK_RED
+              border: `1px solid ${colors.DARK_RED}`,
+              color: colors.DARK_RED
             }}>
               <span>⚠️</span>
               <div>
@@ -721,144 +1602,155 @@ function App() {
             </div>
           )}
 
-
-          {/* Graph Stats with better design */}
+          {/* Legend */}
           {graphData && (
-            <div className="mt-4 p-3 rounded-lg" style={{
-              backgroundColor: PolicyEngineTheme.colors.TEAL_LIGHT,
-              border: `1px solid ${PolicyEngineTheme.colors.TEAL_ACCENT}`
+            <div style={{
+              padding: spacing.md,
+              borderRadius: borderRadius.md,
+              backgroundColor: colors.WHITE,
+              border: `1px solid ${colors.BLUE_95}`,
+              boxShadow: shadows.sm
             }}>
-              <div className="text-xs font-semibold mb-3" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                Graph Statistics
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="p-3 rounded text-center" style={{
-                  backgroundColor: PolicyEngineTheme.colors.WHITE,
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                }}>
-                  <div style={{ color: PolicyEngineTheme.colors.BLUE_PRIMARY, fontSize: '20px', fontWeight: 'bold' }}>
-                    {graphData.nodes.length}
-                  </div>
-                  <div style={{ color: PolicyEngineTheme.colors.DARK_GRAY, fontSize: '11px' }}>Nodes</div>
-                </div>
-                <div className="p-3 rounded text-center" style={{
-                  backgroundColor: PolicyEngineTheme.colors.WHITE,
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                }}>
-                  <div style={{ color: PolicyEngineTheme.colors.TEAL_ACCENT, fontSize: '20px', fontWeight: 'bold' }}>
-                    {graphData.edges.length}
-                  </div>
-                  <div style={{ color: PolicyEngineTheme.colors.DARK_GRAY, fontSize: '11px' }}>Edges</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Legend Section */}
-          {graphData && (
-            <div className="mt-4 p-4 rounded-lg" style={{
-              backgroundColor: PolicyEngineTheme.colors.WHITE,
-              border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-            }}>
-              <h3 
-                className="text-sm font-semibold cursor-pointer flex items-center gap-1"
+              <h3
                 onClick={() => setLegendExpanded(!legendExpanded)}
-                style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE, userSelect: 'none', margin: 0 }}
+                style={{
+                  fontSize: typography.fontSize.sm,
+                  fontWeight: typography.fontWeight.semibold,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: spacing.xs,
+                  color: colors.DARKEST_BLUE,
+                  userSelect: 'none',
+                  margin: 0
+                }}
               >
                 Legend
-                <svg
-                  className={`inline-block transition-transform duration-200 ${legendExpanded ? 'rotate-180' : ''}`}
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke={PolicyEngineTheme.colors.DARK_GRAY}
-                  strokeWidth="2"
-                  style={{ marginLeft: '2px' }}
-                >
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
+                <ChevronIcon open={legendExpanded} />
               </h3>
-              
+
               {legendExpanded && (
-                <div className="mt-3 space-y-0">
-                  {/* Node Types */}
-                  <div>
-                    <p className="text-xs font-semibold mb-2" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+                <div style={{ marginTop: spacing.md }}>
+                  {/* Nodes */}
+                  <div style={{ marginBottom: spacing.md }}>
+                    <p style={{
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.sm,
+                      color: colors.DARKEST_BLUE
+                    }}>
                       Nodes
                     </p>
-                    <div className="space-y-2" style={{ paddingLeft: '12px' }}>
-                      <div className="flex items-center gap-3">
-                        <div style={{ 
-                          width: '14px',
-                          height: '14px',
-                          borderRadius: '50%',
-                          backgroundColor: PolicyEngineTheme.colors.TEAL_ACCENT,
-                          flexShrink: 0
-                        }}></div>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Root</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div style={{ 
-                          width: '14px',
-                          height: '14px',
-                          borderRadius: '50%',
-                          backgroundColor: PolicyEngineTheme.colors.BLUE_PRIMARY,
-                          flexShrink: 0
-                        }}></div>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Dependency</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div style={{ 
-                          width: '14px',
-                          height: '14px',
-                          borderRadius: '50%',
-                          backgroundColor: PolicyEngineTheme.colors.DARK_RED,
-                          flexShrink: 0
-                        }}></div>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Stop</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div style={{ 
-                          width: '14px',
-                          height: '14px',
-                          borderRadius: '50%',
-                          backgroundColor: '#8B4B9B',
-                          flexShrink: 0
-                        }}></div>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Defined For</span>
-                      </div>
+                    <div style={{ paddingLeft: spacing.md }}>
+                      {[
+                        { color: colors.TEAL_ACCENT, label: 'Root' },
+                        { color: colors.BLUE_PRIMARY, label: 'Dependency' },
+                        { color: colors.DARK_RED, label: 'Stop' },
+                        { color: '#8B4B9B', label: 'Defined For' }
+                      ].map((item, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: spacing.md,
+                          marginBottom: spacing.sm
+                        }}>
+                          <div style={{
+                            width: '14px',
+                            height: '14px',
+                            borderRadius: borderRadius.full,
+                            backgroundColor: item.color,
+                            flexShrink: 0
+                          }}></div>
+                          <span style={{
+                            fontSize: typography.fontSize.xs,
+                            color: colors.DARK_GRAY
+                          }}>
+                            {item.label}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Divider */}
-                  <div style={{ 
-                    borderTop: `1px dashed ${PolicyEngineTheme.colors.BLUE_95}`,
-                    marginTop: '6px',
-                    marginBottom: '6px'
-                  }}></div>
-
-                  {/* Edge Types */}
-                  <div>
-                    <p className="text-xs font-semibold mb-2" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+                  {/* Edges */}
+                  <div style={{ marginBottom: spacing.md }}>
+                    <p style={{
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.sm,
+                      color: colors.DARKEST_BLUE
+                    }}>
                       Edges
                     </p>
-                    <div className="space-y-2" style={{ paddingLeft: '12px' }}>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold" style={{ color: PolicyEngineTheme.colors.GREEN, minWidth: '65px' }}>+ (green)</span>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Addition</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold" style={{ color: PolicyEngineTheme.colors.DARK_RED, minWidth: '65px' }}>- (red)</span>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Subtraction</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div style={{ minWidth: '65px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div className="w-8 h-0.5" style={{ backgroundColor: PolicyEngineTheme.colors.GRAY }}></div>
+                    <div style={{ paddingLeft: spacing.md }}>
+                      {[
+                        { color: colors.GREEN, label: 'Addition', symbol: '+' },
+                        { color: colors.DARK_RED, label: 'Subtraction', symbol: '-' },
+                        { color: colors.GRAY, label: 'Reference', symbol: '→' }
+                      ].map((item, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: spacing.sm,
+                          marginBottom: spacing.sm
+                        }}>
+                          <span style={{
+                            fontSize: typography.fontSize.sm,
+                            fontWeight: typography.fontWeight.bold,
+                            color: item.color,
+                            minWidth: '24px'
+                          }}>
+                            {item.symbol}
+                          </span>
+                          <span style={{
+                            fontSize: typography.fontSize.xs,
+                            color: colors.DARK_GRAY
+                          }}>
+                            {item.label}
+                          </span>
                         </div>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Reference</span>
-                      </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Interactions */}
+                  <div>
+                    <p style={{
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.sm,
+                      color: colors.DARKEST_BLUE
+                    }}>
+                      Click on Node
+                    </p>
+                    <div style={{ paddingLeft: spacing.md }}>
+                      {[
+                        { icon: '➕', label: 'Add to Stop Variables' },
+                        { icon: '🚫', label: 'Hide Parameters' },
+                        { icon: '📄', label: 'View Source Code' },
+                        { icon: '✨', label: 'Highlight Path' }
+                      ].map((item, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: spacing.sm,
+                          marginBottom: spacing.sm
+                        }}>
+                          <span style={{
+                            fontSize: typography.fontSize.sm,
+                            minWidth: '20px',
+                            textAlign: 'center'
+                          }}>
+                            {item.icon}
+                          </span>
+                          <span style={{
+                            fontSize: typography.fontSize.xs,
+                            color: colors.DARK_GRAY
+                          }}>
+                            {item.label}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -866,31 +1758,490 @@ function App() {
             </div>
           )}
         </div>
-      </div>
+      </aside>
 
-      {/* Graph Container with better styling */}
-      <div style={{ 
+      {/* Main Graph Area */}
+      <main style={{
         flex: 1,
-        padding: '24px',
+        padding: spacing.lg,
         minWidth: 0,
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
         overflow: 'hidden',
-        position: 'relative'
+        position: isFullscreen ? 'fixed' : 'relative',
+        top: isFullscreen ? 0 : 'auto',
+        left: isFullscreen ? 0 : 'auto',
+        right: isFullscreen ? 0 : 'auto',
+        bottom: isFullscreen ? 0 : 'auto',
+        zIndex: isFullscreen ? 1000 : 'auto',
+        width: isFullscreen ? '100vw' : 'auto'
       }}>
-        <div ref={networkContainer} style={{
-          width: '100%',
-          height: '100%',
-          backgroundColor: PolicyEngineTheme.colors.WHITE,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
-          border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-          borderRadius: '12px',
-          flex: 1
-        }}></div>
-        
-      </div>
+        {/* Fullscreen Button */}
+        {graphData && (
+          <button
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            style={{
+              position: 'absolute',
+              top: spacing.xl,
+              right: spacing.xl,
+              zIndex: 10,
+              padding: spacing.sm,
+              backgroundColor: colors.WHITE,
+              border: `1px solid ${colors.BLUE_95}`,
+              borderRadius: borderRadius.md,
+              cursor: 'pointer',
+              boxShadow: shadows.md,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: transitions.normal,
+              color: colors.DARKEST_BLUE
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = colors.BLUE_98;
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = colors.WHITE;
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+          >
+            <FullscreenIcon isFullscreen={isFullscreen} />
+          </button>
+        )}
 
+        {/* Adjust Layout Button */}
+        {graphData && (
+          <button
+            onClick={() => {
+              if (networkInstance.current && networkContainer.current) {
+                // Save current spacing
+                const originalNodeSpacing = nodeSpacing;
+                const originalLevelSeparation = levelSeparation;
+
+                // Temporarily increase spacing
+                setNodeSpacing(nodeSpacing * 1.3);
+                setLevelSeparation(levelSeparation * 1.3);
+
+                // Set flag and destroy current network
+                skipAutoReposition.current = true;
+                networkInstance.current.destroy();
+
+                // Recreate with wider spacing
+                const options = {
+                  layout: {
+                    hierarchical: {
+                      enabled: true,
+                      direction: layoutDirection,
+                      sortMethod: 'directed',
+                      nodeSpacing: nodeSpacing * 1.3,
+                      levelSeparation: levelSeparation * 1.3,
+                      treeSpacing: 250,
+                      blockShifting: true,
+                      edgeMinimization: true,
+                      parentCentralization: true,
+                      shakeTowards: 'leaves'
+                    }
+                  },
+                  autoResize: true,
+                  physics: { enabled: false },
+                  nodes: {
+                    borderWidth: 2,
+                    borderWidthSelected: 4,
+                    margin: { top: 10, right: 15, bottom: 10, left: 15 },
+                    widthConstraint: { maximum: 250 },
+                    heightConstraint: { minimum: 40 },
+                    font: {
+                      size: 14,
+                      face: typography.fontFamily.sans,
+                      bold: { face: typography.fontFamily.sans }
+                    },
+                    shape: 'box',
+                    shadow: {
+                      enabled: true,
+                      color: 'rgba(0,0,0,0.1)',
+                      size: 10,
+                      x: 2,
+                      y: 2
+                    },
+                    chosen: {
+                      node: function(values: any, id: any, selected: any, hovering: any) {
+                        if (hovering) {
+                          values.borderWidth = 3;
+                          values.shadow = true;
+                          values.shadowSize = 14;
+                        }
+                      },
+                      label: false
+                    }
+                  },
+                  edges: {
+                    smooth: {
+                      enabled: true,
+                      type: layoutDirection === 'LR' || layoutDirection === 'RL' ? 'cubicBezier' : 'vertical',
+                      roundness: 0.5,
+                      forceDirection: layoutDirection === 'UD' || layoutDirection === 'DU' ? 'vertical' : 'horizontal'
+                    },
+                    width: 2,
+                    arrows: {
+                      to: { enabled: true, scaleFactor: 1.2 }
+                    },
+                    color: {
+                      inherit: false
+                    },
+                    chosen: true
+                  },
+                  interaction: {
+                    hover: true,
+                    tooltipDelay: 300,
+                    zoomView: true,
+                    dragView: true,
+                    navigationButtons: false,
+                    keyboard: { enabled: false },
+                    zoomSpeed: 0.5,
+                    hideEdgesOnDrag: false,
+                    hideEdgesOnZoom: false,
+                    hideNodesOnDrag: false
+                  }
+                };
+
+                networkInstance.current = new Network(
+                  networkContainer.current,
+                  { nodes: graphData.nodes, edges: graphData.edges },
+                  options
+                );
+
+                // Re-attach event listeners
+                networkInstance.current.on("hoverNode", function () {
+                  document.body.style.cursor = 'pointer';
+                });
+
+                networkInstance.current.on("blurNode", function () {
+                  document.body.style.cursor = 'default';
+                });
+
+                // Add context menu on right-click
+                networkInstance.current.on("oncontext", function (params) {
+                  params.event.preventDefault();
+                  if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    const event = params.event.srcEvent || params.event;
+                    const menuWidth = 200;
+                    const menuHeight = 150;
+                    let x = event.clientX + 10;
+                    let y = event.clientY + 10;
+
+                    if (x + menuWidth > window.innerWidth) {
+                      x = event.clientX - menuWidth - 10;
+                    }
+                    if (y + menuHeight > window.innerHeight) {
+                      y = event.clientY - menuHeight - 10;
+                    }
+
+                    setContextMenu({ x, y, nodeId });
+                  }
+                });
+
+                // Add context menu on regular click
+                networkInstance.current.on("click", function (params) {
+                  if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    const event = params.event.srcEvent || params.event;
+                    const menuWidth = 200;
+                    const menuHeight = 150;
+                    let x = event.clientX + 10;
+                    let y = event.clientY + 10;
+
+                    if (x + menuWidth > window.innerWidth) {
+                      x = event.clientX - menuWidth - 10;
+                    }
+                    if (y + menuHeight > window.innerHeight) {
+                      y = event.clientY - menuHeight - 10;
+                    }
+
+                    setContextMenu({ x, y, nodeId });
+                  } else {
+                    setContextMenu(null);
+                    if (highlightedPath.size > 0) {
+                      clearHighlight();
+                    }
+                  }
+                });
+
+                setTimeout(() => {
+                  if (networkInstance.current) {
+                    networkInstance.current.fit();
+                  }
+                  // Restore original spacing values
+                  setNodeSpacing(originalNodeSpacing);
+                  setLevelSeparation(originalLevelSeparation);
+                }, 600);
+              }
+            }}
+            style={{
+              position: 'absolute',
+              bottom: spacing.xl,
+              right: spacing.xl,
+              zIndex: 10,
+              padding: `${spacing.sm} ${spacing.md}`,
+              backgroundColor: colors.BLUE_PRIMARY,
+              border: `1px solid ${colors.BLUE_PRESSED}`,
+              borderRadius: borderRadius.md,
+              cursor: 'pointer',
+              boxShadow: shadows.md,
+              display: 'flex',
+              alignItems: 'center',
+              gap: spacing.xs,
+              transition: transitions.normal,
+              color: colors.WHITE,
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.medium
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = colors.BLUE_PRESSED;
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = colors.BLUE_PRIMARY;
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            title="Adjust graph layout for better clarity"
+          >
+            <span>Adjust Layout</span>
+          </button>
+        )}
+
+        {/* Clear Highlight Button - Shows when highlighting is active */}
+        {graphData && highlightedPath.size > 0 && (
+          <button
+            onClick={() => clearHighlight()}
+            style={{
+              position: 'absolute',
+              top: spacing.xl,
+              right: `calc(${spacing.xl} + 50px)`,
+              zIndex: 10,
+              padding: `${spacing.sm} ${spacing.md}`,
+              backgroundColor: colors.BLUE_PRIMARY,
+              border: `1px solid ${colors.BLUE_PRESSED}`,
+              borderRadius: borderRadius.md,
+              cursor: 'pointer',
+              boxShadow: shadows.md,
+              display: 'flex',
+              alignItems: 'center',
+              gap: spacing.xs,
+              transition: transitions.normal,
+              color: colors.WHITE,
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.medium
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = colors.BLUE_PRESSED;
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = colors.BLUE_PRIMARY;
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            title="Clear path highlight"
+          >
+            <span>Clear Highlight</span>
+          </button>
+        )}
+
+        <div
+          ref={networkContainer}
+          style={{
+            width: '100%',
+            height: '100%',
+            backgroundColor: colors.WHITE,
+            boxShadow: isFullscreen ? 'none' : shadows.lg,
+            border: isFullscreen ? 'none' : `1px solid ${colors.BLUE_95}`,
+            borderRadius: isFullscreen ? 0 : borderRadius.lg,
+            flex: 1
+          }}
+        ></div>
+      </main>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            top: contextMenu.y,
+            left: contextMenu.x,
+            backgroundColor: colors.WHITE,
+            border: `1px solid ${colors.BLUE_95}`,
+            borderRadius: borderRadius.md,
+            boxShadow: shadows.xl,
+            zIndex: 10000,
+            minWidth: '180px',
+            overflow: 'hidden'
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              if (!stopVariables.includes(contextMenu.nodeId)) {
+                const newStopVars = [...stopVariables, contextMenu.nodeId];
+                setStopVariables(newStopVars);
+                // Regenerate flowchart with the new stop variables immediately
+                generateFlowchart(newStopVars, undefined);
+              }
+              setContextMenu(null);
+            }}
+            disabled={stopVariables.includes(contextMenu.nodeId)}
+            style={{
+              width: '100%',
+              padding: `${spacing.sm} ${spacing.md}`,
+              textAlign: 'left',
+              fontSize: typography.fontSize.sm,
+              color: stopVariables.includes(contextMenu.nodeId) ? colors.MEDIUM_LIGHT_GRAY : colors.DARKEST_BLUE,
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: stopVariables.includes(contextMenu.nodeId) ? 'not-allowed' : 'pointer',
+              transition: transitions.fast,
+              display: 'flex',
+              alignItems: 'center',
+              gap: spacing.sm
+            }}
+            onMouseEnter={(e) => {
+              if (!stopVariables.includes(contextMenu.nodeId)) {
+                e.currentTarget.style.backgroundColor = colors.TEAL_LIGHT;
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span>➕</span>
+            <span>Add to Stop Variables</span>
+          </button>
+          <button
+            onClick={() => {
+              if (!noParamsList.includes(contextMenu.nodeId)) {
+                const newNoParams = [...noParamsList, contextMenu.nodeId];
+                setNoParamsList(newNoParams);
+                // Regenerate flowchart with the new no-params list immediately
+                generateFlowchart(undefined, newNoParams);
+              }
+              setContextMenu(null);
+            }}
+            disabled={noParamsList.includes(contextMenu.nodeId)}
+            style={{
+              width: '100%',
+              padding: `${spacing.sm} ${spacing.md}`,
+              textAlign: 'left',
+              fontSize: typography.fontSize.sm,
+              color: noParamsList.includes(contextMenu.nodeId) ? colors.MEDIUM_LIGHT_GRAY : colors.DARKEST_BLUE,
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderTop: `1px solid ${colors.BLUE_98}`,
+              cursor: noParamsList.includes(contextMenu.nodeId) ? 'not-allowed' : 'pointer',
+              transition: transitions.fast,
+              display: 'flex',
+              alignItems: 'center',
+              gap: spacing.sm
+            }}
+            onMouseEnter={(e) => {
+              if (!noParamsList.includes(contextMenu.nodeId)) {
+                e.currentTarget.style.backgroundColor = colors.TEAL_LIGHT;
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span>🚫</span>
+            <span>Hide Parameters</span>
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                const response = await axios.get(`${API_BASE}/variable/${encodeURIComponent(contextMenu.nodeId)}/source`, {
+                  params: { country: selectedCountry }
+                });
+                if (response.data.success) {
+                  window.open(response.data.url, '_blank');
+                } else {
+                  alert(`Could not find source code for ${contextMenu.nodeId}: ${response.data.error}`);
+                }
+              } catch (err: any) {
+                console.error('Failed to get source URL:', err);
+                alert(`Error getting source code: ${err.response?.data?.error || err.message}`);
+              }
+              setContextMenu(null);
+            }}
+            style={{
+              width: '100%',
+              padding: `${spacing.sm} ${spacing.md}`,
+              textAlign: 'left',
+              fontSize: typography.fontSize.sm,
+              color: colors.DARKEST_BLUE,
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderTop: `1px solid ${colors.BLUE_98}`,
+              cursor: 'pointer',
+              transition: transitions.fast,
+              display: 'flex',
+              alignItems: 'center',
+              gap: spacing.sm
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = colors.TEAL_LIGHT;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span>📄</span>
+            <span>View Source Code</span>
+          </button>
+          <button
+            onClick={() => {
+              highlightPath(contextMenu.nodeId);
+              setContextMenu(null);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: spacing.sm,
+              width: '100%',
+              padding: `${spacing.sm} ${spacing.md}`,
+              fontSize: typography.fontSize.sm,
+              color: colors.DARKEST_BLUE,
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderTop: `1px solid ${colors.BLUE_95}`,
+              cursor: 'pointer',
+              transition: transitions.fast,
+              textAlign: 'left'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = colors.BLUE_98;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span>✨</span>
+            <span>Highlight Path</span>
+          </button>
+          <div
+            style={{
+              padding: `${spacing.xs} ${spacing.md}`,
+              fontSize: typography.fontSize.xs,
+              color: colors.DARK_GRAY,
+              backgroundColor: colors.BLUE_98,
+              borderTop: `1px solid ${colors.BLUE_95}`,
+              fontFamily: typography.fontFamily.mono
+            }}
+          >
+            {contextMenu.nodeId}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

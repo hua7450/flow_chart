@@ -249,6 +249,65 @@ def get_countries():
     })
 
 
+@app.route('/api/variable/<variable_name>/source', methods=['GET'])
+def get_variable_source(variable_name):
+    """Get the GitHub source URL for a variable."""
+    try:
+        print(f"DEBUG: Looking for variable: {variable_name}")
+        # Get country parameter (default to US)
+        country = request.args.get('country', 'US').upper()
+        print(f"DEBUG: Country: {country}")
+
+        # Select appropriate cache
+        cache = UK_VARIABLES_CACHE if country == 'UK' else US_VARIABLES_CACHE
+        print(f"DEBUG: Cache has {len(cache)} variables")
+
+        if variable_name not in cache:
+            print(f"DEBUG: Variable {variable_name} not found in cache")
+            print(f"DEBUG: Sample keys: {list(cache.keys())[:5]}")
+            return jsonify({
+                'success': False,
+                'error': f'Variable {variable_name} not found'
+            }), 404
+
+        var_data = cache[variable_name]
+        file_path = var_data.get('file_path')
+
+        if not file_path:
+            return jsonify({
+                'success': False,
+                'error': 'No file path available for this variable'
+            }), 404
+
+        # Convert local file path to GitHub URL
+        if country == 'UK':
+            # For UK: ../policyengine-uk/policyengine_uk/variables/...
+            # Convert to: https://github.com/PolicyEngine/policyengine-uk/blob/master/policyengine_uk/variables/...
+            github_base = 'https://github.com/PolicyEngine/policyengine-uk/blob/master/'
+            # Remove the ../policyengine-uk/ prefix
+            rel_path = str(file_path).replace('../policyengine-uk/', '')
+        else:
+            # For US: ../policyengine-us/policyengine_us/variables/...
+            # Convert to: https://github.com/PolicyEngine/policyengine-us/blob/master/policyengine_us/variables/...
+            github_base = 'https://github.com/PolicyEngine/policyengine-us/blob/master/'
+            # Remove the ../policyengine-us/ prefix
+            rel_path = str(file_path).replace('../policyengine-us/', '')
+
+        github_url = github_base + rel_path
+
+        return jsonify({
+            'success': True,
+            'url': github_url,
+            'variable': variable_name,
+            'country': country
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @app.route('/api/search', methods=['GET'])
 def search_variables():
     """Search variables by name or label."""
