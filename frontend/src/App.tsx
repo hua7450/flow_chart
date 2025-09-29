@@ -223,6 +223,9 @@ function App() {
     setSearchTerm('');
     setShowSearchResults(false);
     setError('');
+    // Clear stop variables and no params list when selecting new variable
+    setStopVariables([]);
+    setNoParamsList([]);
     loadVariables();
   };
 
@@ -862,15 +865,35 @@ function App() {
                     </div>
 
                     <div style={{ marginBottom: spacing.md }}>
-                      <label style={{
-                        display: 'block',
-                        fontSize: typography.fontSize.xs,
-                        fontWeight: typography.fontWeight.medium,
-                        marginBottom: spacing.xs,
-                        color: colors.DARKEST_BLUE
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: spacing.xs
                       }}>
-                        Don't Show Parameters For:
-                      </label>
+                        <label style={{
+                          fontSize: typography.fontSize.xs,
+                          fontWeight: typography.fontWeight.medium,
+                          color: colors.DARKEST_BLUE
+                        }}>
+                          Don't Show Parameters For:
+                        </label>
+                        {noParamsList.length > 0 && (
+                          <button
+                            onClick={() => setNoParamsList([])}
+                            style={{
+                              fontSize: typography.fontSize.xs,
+                              color: colors.TEAL_PRESSED,
+                              backgroundColor: 'transparent',
+                              padding: spacing.xs,
+                              cursor: 'pointer',
+                              textDecoration: 'underline'
+                            }}
+                          >
+                            Clear all
+                          </button>
+                        )}
+                      </div>
 
                       {/* Selected no-params variables as chips */}
                       {noParamsList.length > 0 && (
@@ -1042,15 +1065,35 @@ function App() {
 
                 {/* Stop Variables */}
                 <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: typography.fontSize.xs,
-                    fontWeight: typography.fontWeight.medium,
-                    marginBottom: spacing.xs,
-                    color: colors.DARKEST_BLUE
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: spacing.xs
                   }}>
-                    Stop Variables:
-                  </label>
+                    <label style={{
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.medium,
+                      color: colors.DARKEST_BLUE
+                    }}>
+                      Stop Variables:
+                    </label>
+                    {stopVariables.length > 0 && (
+                      <button
+                        onClick={() => setStopVariables([])}
+                        style={{
+                          fontSize: typography.fontSize.xs,
+                          color: colors.TEAL_PRESSED,
+                          backgroundColor: 'transparent',
+                          padding: spacing.xs,
+                          cursor: 'pointer',
+                          textDecoration: 'underline'
+                        }}
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
 
                   {/* Selected stop variables as chips */}
                   {stopVariables.length > 0 && (
