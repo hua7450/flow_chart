@@ -131,6 +131,29 @@ function App() {
     loadVariables();
   }, [selectedCountry]);
 
+  // Check URL parameters on mount and auto-load variable
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const variableParam = params.get('variable');
+    const countryParam = params.get('country');
+
+    if (countryParam && (countryParam === 'US' || countryParam === 'UK')) {
+      setSelectedCountry(countryParam);
+    }
+
+    if (variableParam && variables.length > 0 && !selectedVariable) {
+      // Verify variable exists
+      const variableExists = variables.some(v => v.name === variableParam);
+      if (variableExists) {
+        setSelectedVariable(variableParam);
+        // Trigger graph generation after a short delay
+        setTimeout(() => {
+          generateFlowchart();
+        }, 100);
+      }
+    }
+  }, [variables]); // Only run when variables change
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -208,6 +231,12 @@ function App() {
       setError('Please select a variable');
       return;
     }
+
+    // Update URL with selected variable and country
+    const url = new URL(window.location.href);
+    url.searchParams.set('variable', selectedVariable);
+    url.searchParams.set('country', selectedCountry);
+    window.history.pushState({}, '', url.toString());
 
     setLoading(true);
     setError('');
@@ -500,6 +529,8 @@ function App() {
                 setSearchTerm('');
                 setError('');
                 setGraphData(null);
+                // Clear URL parameters
+                window.history.pushState({}, '', window.location.pathname);
               }}
               style={{
                 width: '100%',
@@ -666,7 +697,10 @@ function App() {
                   onClick={() => {
                     setSelectedVariable('');
                     setSearchTerm('');
-                    loadVariables();
+                    setGraphData(null);
+                    setError('');
+                    // Clear URL parameters
+                    window.history.pushState({}, '', window.location.pathname);
                   }}
                   style={{
                     padding: spacing.sm,
