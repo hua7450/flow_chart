@@ -34,34 +34,52 @@ interface GraphData {
 }
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5001/api';
+const { colors, spacing, typography, borderRadius, shadows, transitions } = PolicyEngineTheme;
 
 // Icon components
 const SearchIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="11" cy="11" r="8"></circle>
     <path d="m21 21-4.35-4.35"></path>
   </svg>
 );
 
 const ChevronIcon = ({ open }: { open: boolean }) => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-    style={{ transform: open ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }}>
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    style={{
+      transform: open ? 'rotate(180deg)' : 'rotate(0)',
+      transition: transitions.normal
+    }}
+  >
     <polyline points="6 9 12 15 18 9"></polyline>
   </svg>
 );
 
 const ClearIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="18" y1="6" x2="6" y2="18"></line>
     <line x1="6" y1="6" x2="18" y2="18"></line>
   </svg>
 );
 
 const LoadingSpinner = () => (
-  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+  <div className="spinner" style={{
+    width: '16px',
+    height: '16px',
+    border: `2px solid ${colors.WHITE}`,
+    borderTopColor: 'transparent',
+    borderRadius: borderRadius.full
+  }}></div>
 );
 
 function App() {
+  // State
   const [variables, setVariables] = useState<Variable[]>([]);
   const [selectedVariable, setSelectedVariable] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -71,7 +89,8 @@ function App() {
   const [error, setError] = useState<string>('');
   const [detailsOpen, setDetailsOpen] = useState<boolean>(false);
   const [selectedCountry, setSelectedCountry] = useState<string>('US');
-  
+  const [legendExpanded, setLegendExpanded] = useState<boolean>(true);
+
   // Controls
   const [maxDepth, setMaxDepth] = useState<number>(10);
   const [expandAddsSubtracts, setExpandAddsSubtracts] = useState<boolean>(true);
@@ -80,8 +99,7 @@ function App() {
   const [paramDetailLevel, setParamDetailLevel] = useState<string>('Summary');
   const [stopVariables, setStopVariables] = useState<string>('');
   const [noParamsList, setNoParamsList] = useState<string>('');
-  const [legendExpanded, setLegendExpanded] = useState<boolean>(true);
-  
+
   const networkContainer = useRef<HTMLDivElement>(null);
   const networkInstance = useRef<Network | null>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -124,7 +142,7 @@ function App() {
       setShowSearchResults(false);
       return;
     }
-    
+
     try {
       const response = await axios.get(`${API_BASE}/search`, {
         params: { q: query, country: selectedCountry }
@@ -183,7 +201,6 @@ function App() {
   const renderGraph = (data: GraphData) => {
     if (!networkContainer.current) return;
 
-    // Destroy existing network if it exists
     if (networkInstance.current) {
       networkInstance.current.destroy();
     }
@@ -203,9 +220,7 @@ function App() {
         }
       },
       autoResize: true,
-      physics: {
-        enabled: false
-      },
+      physics: { enabled: false },
       nodes: {
         borderWidth: 2,
         borderWidthSelected: 4,
@@ -214,25 +229,23 @@ function App() {
         heightConstraint: { minimum: 40 },
         font: {
           size: 14,
-          face: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
-          bold: {
-            face: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'
-          }
+          face: typography.fontFamily.sans,
+          bold: { face: typography.fontFamily.sans }
         },
         shape: 'box',
         shadow: {
           enabled: true,
-          color: 'rgba(0,0,0,0.15)',
-          size: 12,
+          color: 'rgba(0,0,0,0.1)',
+          size: 10,
           x: 2,
-          y: 3
+          y: 2
         },
         chosen: {
           node: function(values: any, id: any, selected: any, hovering: any) {
             if (hovering) {
               values.borderWidth = 3;
               values.shadow = true;
-              values.shadowSize = 16;
+              values.shadowSize = 14;
             }
           },
           label: false
@@ -246,10 +259,7 @@ function App() {
         },
         width: 2,
         arrows: {
-          to: {
-            enabled: true,
-            scaleFactor: 1.2
-          }
+          to: { enabled: true, scaleFactor: 1.2 }
         }
       },
       interaction: {
@@ -257,63 +267,52 @@ function App() {
         tooltipDelay: 100,
         zoomView: true,
         dragView: true,
-        navigationButtons: false,  // Disabled navigation buttons
-        keyboard: {
-          enabled: false  // Disabled to prevent conflicts with search
-        }
+        navigationButtons: false,
+        keyboard: { enabled: false }
       }
     };
 
-    // Create new network
     networkInstance.current = new Network(
       networkContainer.current,
       { nodes: data.nodes, edges: data.edges },
       options
     );
 
-    // After initial render, fix overlapping by ensuring proper spacing
     setTimeout(() => {
       if (!networkInstance.current) return;
-      
+
       const positions = networkInstance.current.getPositions();
       if (!positions) return;
-      
-      // Group nodes by their Y position (level)
+
       const levels: Map<number, string[]> = new Map();
-      
+
       for (const nodeId in positions) {
-        const y = Math.round(positions[nodeId].y / 10) * 10; // Round to nearest 10 for grouping
+        const y = Math.round(positions[nodeId].y / 10) * 10;
         if (!levels.has(y)) {
           levels.set(y, []);
         }
         levels.get(y)!.push(nodeId);
       }
-      
-      // For each level, ensure proper spacing
-      const minSpacing = 180; // Minimum horizontal spacing
-      
+
+      const minSpacing = 180;
+
       levels.forEach((nodesAtLevel) => {
         if (nodesAtLevel.length <= 1) return;
-        
-        // Sort nodes by current X position
+
         nodesAtLevel.sort((a, b) => positions[a].x - positions[b].x);
-        
-        // Calculate total width needed
+
         const totalWidth = (nodesAtLevel.length - 1) * minSpacing;
         const startX = -totalWidth / 2;
-        
-        // Position nodes with equal spacing
+
         nodesAtLevel.forEach((nodeId, index) => {
           const newX = startX + (index * minSpacing);
           networkInstance.current?.moveNode(nodeId, newX, positions[nodeId].y);
         });
       });
-      
-      // Fit the view to show all nodes (without animation to avoid zoom issues)
+
       networkInstance.current.fit();
     }, 100);
 
-    // Add hover effects
     networkInstance.current.on("hoverNode", function () {
       document.body.style.cursor = 'pointer';
     });
@@ -322,11 +321,9 @@ function App() {
       document.body.style.cursor = 'default';
     });
 
-    // Wait for stabilization then fit the entire graph in view
     networkInstance.current.on("stabilizationIterationsDone", function () {
       setTimeout(() => {
         if (networkInstance.current) {
-          // Fit the entire network in the viewport
           networkInstance.current.fit({
             animation: {
               duration: 1000,
@@ -337,166 +334,231 @@ function App() {
       }, 100);
     });
 
-    // Trigger stabilization
     networkInstance.current.stabilize();
   };
 
-  // Filter variables based on search
   const filteredVariables = searchTerm.length >= 2
-    ? variables.filter(v => 
+    ? variables.filter(v =>
         v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (v.label || '').toLowerCase().includes(searchTerm.toLowerCase())
       )
     : variables;
 
   return (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'row', 
+    <div style={{
+      display: 'flex',
       height: '100vh',
       width: '100vw',
-      backgroundColor: PolicyEngineTheme.colors.BLUE_98,
-      overflow: 'hidden'
+      backgroundColor: colors.BLUE_98,
+      overflow: 'hidden',
+      fontFamily: typography.fontFamily.sans
     }}>
-      {/* Modern Sidebar */}
-      <div style={{ 
+      {/* Sidebar */}
+      <aside style={{
         width: '380px',
         flexShrink: 0,
-        backgroundColor: PolicyEngineTheme.colors.WHITE,
-        borderRight: `2px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-        boxShadow: '4px 0 12px rgba(0,0,0,0.05)',
+        backgroundColor: colors.WHITE,
+        borderRight: `1px solid ${colors.BLUE_95}`,
+        boxShadow: shadows.lg,
         overflowY: 'auto',
-        height: '100vh',
-        marginLeft: '16px'
+        height: '100vh'
       }}>
-        <div style={{ padding: '20px 24px' }}>
-          {/* Header with gradient */}
-          <div className="mb-6" style={{
-            padding: '24px',
-            background: `linear-gradient(135deg, ${PolicyEngineTheme.colors.BLUE_PRIMARY} 0%, ${PolicyEngineTheme.colors.TEAL_ACCENT} 100%)`,
-            borderRadius: '12px',
-            boxShadow: '0 4px 16px rgba(44, 100, 150, 0.3)'
+        <div style={{ padding: spacing.lg }}>
+          {/* Header */}
+          <header style={{
+            padding: spacing.lg,
+            background: `linear-gradient(135deg, ${colors.BLUE_PRIMARY} 0%, ${colors.TEAL_ACCENT} 100%)`,
+            borderRadius: borderRadius.lg,
+            boxShadow: shadows.md,
+            marginBottom: spacing.lg
           }}>
-            <div>
-              <h1 className="text-xl font-bold text-white">
-                PolicyEngine Flowchart
-              </h1>
-              <p className="text-xs mt-1" style={{ color: PolicyEngineTheme.colors.BLUE_98, opacity: 0.95 }}>
-                Visualize variable dependencies
-              </p>
-              
-              {/* Country Selector */}
-              <div className="mt-3">
-                <select 
-                  value={selectedCountry}
-                  onChange={(e) => {
-                    setSelectedCountry(e.target.value);
-                    setSelectedVariable('');
-                    setSearchTerm('');
-                    setError('');
-                    setGraphData(null);
-                  }}
-                  className="px-3 py-1 text-sm rounded-md"
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    color: PolicyEngineTheme.colors.DARKEST_BLUE,
-                    border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-                    outline: 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="US">🇺🇸 United States</option>
-                  <option value="UK">🇬🇧 United Kingdom</option>
-                </select>
-              </div>
-            </div>
-          </div>
+            <h1 style={{
+              fontSize: typography.fontSize.xl,
+              fontWeight: typography.fontWeight.bold,
+              color: colors.WHITE,
+              margin: 0,
+              marginBottom: spacing.xs
+            }}>
+              PolicyEngine Flowchart
+            </h1>
+            <p style={{
+              fontSize: typography.fontSize.sm,
+              color: colors.BLUE_98,
+              margin: 0,
+              marginBottom: spacing.md,
+              opacity: 0.95
+            }}>
+              Visualize variable dependencies
+            </p>
 
-          {/* Enhanced Search */}
-          <div className="mb-5 relative" ref={searchContainerRef}>
-            <label className="block text-sm font-semibold mb-2" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+            {/* Country Selector */}
+            <select
+              value={selectedCountry}
+              onChange={(e) => {
+                setSelectedCountry(e.target.value);
+                setSelectedVariable('');
+                setSearchTerm('');
+                setError('');
+                setGraphData(null);
+              }}
+              style={{
+                width: '100%',
+                padding: spacing.sm,
+                fontSize: typography.fontSize.sm,
+                borderRadius: borderRadius.md,
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                color: colors.DARKEST_BLUE,
+                border: `1px solid ${colors.BLUE_95}`,
+                outline: 'none',
+                cursor: 'pointer',
+                fontWeight: typography.fontWeight.medium,
+                transition: transitions.normal
+              }}
+            >
+              <option value="US">🇺🇸 United States</option>
+              <option value="UK">🇬🇧 United Kingdom</option>
+            </select>
+          </header>
+
+          {/* Search Section */}
+          <section style={{ marginBottom: spacing.lg, position: 'relative' }} ref={searchContainerRef}>
+            <label style={{
+              display: 'block',
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.semibold,
+              marginBottom: spacing.sm,
+              color: colors.DARKEST_BLUE
+            }}>
               Search Variables
             </label>
-            <div className="relative">
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" 
-                   style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
+            <div style={{ position: 'relative' }}>
+              <div style={{
+                position: 'absolute',
+                left: spacing.md,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: colors.DARK_GRAY,
+                pointerEvents: 'none'
+              }}>
                 <SearchIcon />
               </div>
               <input
                 type="text"
-                className="w-full pl-10 pr-3 py-3 text-sm rounded-lg focus:outline-none transition-all"
-                style={{
-                  border: `2px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-                  backgroundColor: PolicyEngineTheme.colors.WHITE,
-                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)'
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = PolicyEngineTheme.colors.TEAL_ACCENT;
-                  e.currentTarget.style.boxShadow = `0 0 0 3px ${PolicyEngineTheme.colors.TEAL_LIGHT}`;
-                  if (searchTerm.length >= 2) setShowSearchResults(true);
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = PolicyEngineTheme.colors.BLUE_95;
-                  e.currentTarget.style.boxShadow = 'inset 0 1px 3px rgba(0,0,0,0.05)';
-                }}
-                placeholder="Type variable name (e.g., household_income)..."
+                placeholder="Type variable name..."
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
                   searchVariables(e.target.value);
                 }}
+                onFocus={() => {
+                  if (searchTerm.length >= 2) setShowSearchResults(true);
+                }}
+                style={{
+                  width: '100%',
+                  height: '44px',
+                  paddingLeft: '44px',
+                  paddingRight: spacing.md,
+                  fontSize: typography.fontSize.base,
+                  border: `2px solid ${colors.BLUE_95}`,
+                  borderRadius: borderRadius.md,
+                  backgroundColor: colors.WHITE,
+                  outline: 'none',
+                  transition: transitions.normal,
+                  boxShadow: shadows.sm
+                }}
+                onFocusCapture={(e) => {
+                  e.currentTarget.style.borderColor = colors.TEAL_ACCENT;
+                  e.currentTarget.style.boxShadow = `0 0 0 3px ${colors.TEAL_LIGHT}`;
+                }}
+                onBlurCapture={(e) => {
+                  e.currentTarget.style.borderColor = colors.BLUE_95;
+                  e.currentTarget.style.boxShadow = shadows.sm;
+                }}
               />
-            </div>
-            
-            {/* Enhanced Dropdown */}
-            {showSearchResults && searchTerm.length >= 2 && (
-              <div className="absolute z-10 w-full mt-2 bg-white rounded-lg shadow-xl max-h-64 overflow-y-auto" style={{
-                border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`
-              }}>
-                {filteredVariables.slice(0, 5).map(v => (
+
+              {/* Dropdown */}
+              {showSearchResults && searchTerm.length >= 2 && (
+                <div style={{
+                  position: 'absolute',
+                  zIndex: 10,
+                  width: '100%',
+                  marginTop: spacing.sm,
+                  backgroundColor: colors.WHITE,
+                  borderRadius: borderRadius.md,
+                  boxShadow: shadows.xl,
+                  maxHeight: '320px',
+                  overflowY: 'auto',
+                  border: `1px solid ${colors.BLUE_95}`
+                }}>
+                {filteredVariables.slice(0, 10).map(v => (
                   <div
                     key={v.name}
-                    className="px-4 py-3 cursor-pointer transition-all text-sm"
-                    style={{
-                      borderBottom: `1px solid ${PolicyEngineTheme.colors.BLUE_98}`
-                    }}
                     onClick={() => selectVariable(v.name)}
+                    style={{
+                      padding: `${spacing.md} ${spacing.md}`,
+                      cursor: 'pointer',
+                      transition: transitions.fast,
+                      borderBottom: `1px solid ${colors.BLUE_98}`,
+                      fontSize: typography.fontSize.sm
+                    }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = PolicyEngineTheme.colors.TEAL_LIGHT;
-                      e.currentTarget.style.paddingLeft = '20px';
+                      e.currentTarget.style.backgroundColor = colors.TEAL_LIGHT;
+                      e.currentTarget.style.paddingLeft = spacing.lg;
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.paddingLeft = '16px';
+                      e.currentTarget.style.paddingLeft = spacing.md;
                     }}
                   >
-                    <div className="font-mono font-semibold" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+                    <div style={{
+                      fontFamily: typography.fontFamily.mono,
+                      fontWeight: typography.fontWeight.semibold,
+                      color: colors.DARKEST_BLUE,
+                      fontSize: typography.fontSize.sm
+                    }}>
                       {v.name}
                     </div>
                   </div>
                 ))}
                 {filteredVariables.length === 0 && (
-                  <div className="px-4 py-3 text-sm" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
+                  <div style={{
+                    padding: spacing.md,
+                    fontSize: typography.fontSize.sm,
+                    color: colors.DARK_GRAY
+                  }}>
                     No variables found matching "{searchTerm}"
                   </div>
                 )}
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
+          </section>
 
-          {/* Selected Variable Card */}
+          {/* Selected Variable */}
           {selectedVariable && (
-            <div className="mb-5 p-4 rounded-lg" style={{
-              backgroundColor: PolicyEngineTheme.colors.TEAL_LIGHT,
-              border: `2px solid ${PolicyEngineTheme.colors.TEAL_ACCENT}`,
-              animation: 'slideIn 0.3s ease-out'
+            <div style={{
+              marginBottom: spacing.lg,
+              padding: spacing.md,
+              borderRadius: borderRadius.md,
+              backgroundColor: colors.TEAL_LIGHT,
+              border: `2px solid ${colors.TEAL_ACCENT}`
             }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-medium mb-1" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontSize: typography.fontSize.xs,
+                    fontWeight: typography.fontWeight.medium,
+                    marginBottom: spacing.xs,
+                    color: colors.DARK_GRAY
+                  }}>
                     Selected Variable ({selectedCountry})
                   </div>
-                  <div className="font-mono text-sm font-bold" style={{ color: PolicyEngineTheme.colors.TEAL_PRESSED }}>
+                  <div style={{
+                    fontFamily: typography.fontFamily.mono,
+                    fontSize: typography.fontSize.sm,
+                    fontWeight: typography.fontWeight.bold,
+                    color: colors.TEAL_PRESSED
+                  }}>
                     {selectedVariable}
                   </div>
                 </div>
@@ -506,19 +568,25 @@ function App() {
                     setSearchTerm('');
                     loadVariables();
                   }}
-                  className="p-2 rounded-md transition-all hover:scale-110"
-                  style={{ 
-                    color: PolicyEngineTheme.colors.TEAL_PRESSED,
-                    backgroundColor: PolicyEngineTheme.colors.WHITE,
-                    border: `1px solid ${PolicyEngineTheme.colors.TEAL_ACCENT}`
+                  style={{
+                    padding: spacing.sm,
+                    borderRadius: borderRadius.md,
+                    color: colors.TEAL_PRESSED,
+                    backgroundColor: colors.WHITE,
+                    border: `1px solid ${colors.TEAL_ACCENT}`,
+                    cursor: 'pointer',
+                    transition: transitions.normal,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = PolicyEngineTheme.colors.TEAL_ACCENT;
-                    e.currentTarget.style.color = PolicyEngineTheme.colors.WHITE;
+                    e.currentTarget.style.backgroundColor = colors.TEAL_ACCENT;
+                    e.currentTarget.style.color = colors.WHITE;
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = PolicyEngineTheme.colors.WHITE;
-                    e.currentTarget.style.color = PolicyEngineTheme.colors.TEAL_PRESSED;
+                    e.currentTarget.style.backgroundColor = colors.WHITE;
+                    e.currentTarget.style.color = colors.TEAL_PRESSED;
                   }}
                 >
                   <ClearIcon />
@@ -527,29 +595,47 @@ function App() {
             </div>
           )}
 
-          {/* Advanced Options with better styling */}
-          <div className="mb-5 rounded-lg overflow-hidden" style={{
-            backgroundColor: PolicyEngineTheme.colors.BLUE_98,
-            border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`
+          {/* Advanced Options */}
+          <div style={{
+            marginBottom: spacing.lg,
+            borderRadius: borderRadius.md,
+            overflow: 'hidden',
+            backgroundColor: colors.BLUE_98,
+            border: `1px solid ${colors.BLUE_95}`
           }}>
             <button
               onClick={() => setDetailsOpen(!detailsOpen)}
-              className="w-full px-4 py-3 text-sm font-semibold flex items-center justify-between transition-all"
-              style={{ 
-                color: PolicyEngineTheme.colors.DARKEST_BLUE,
-                backgroundColor: detailsOpen ? PolicyEngineTheme.colors.BLUE_95 : 'transparent'
+              style={{
+                width: '100%',
+                padding: spacing.md,
+                fontSize: typography.fontSize.sm,
+                fontWeight: typography.fontWeight.semibold,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                color: colors.DARKEST_BLUE,
+                backgroundColor: detailsOpen ? colors.BLUE_95 : 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                transition: transitions.normal
               }}
             >
               <span>⚙️ Advanced Options</span>
               <ChevronIcon open={detailsOpen} />
             </button>
-            
+
             {detailsOpen && (
-              <div className="p-4 space-y-4" style={{ animation: 'slideDown 0.2s ease-out' }}>
-                {/* Max Depth with visual indicator */}
-                <div>
-                  <label className="block text-xs font-medium mb-2" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                    Max Depth: <span className="font-bold text-sm">{maxDepth}</span>
+              <div style={{ padding: spacing.md }}>
+                {/* Max Depth */}
+                <div style={{ marginBottom: spacing.md }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: typography.fontSize.xs,
+                    fontWeight: typography.fontWeight.medium,
+                    marginBottom: spacing.sm,
+                    color: colors.DARKEST_BLUE
+                  }}>
+                    Max Depth: <span style={{ fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>{maxDepth}</span>
                   </label>
                   <input
                     type="range"
@@ -557,71 +643,83 @@ function App() {
                     max="20"
                     value={maxDepth}
                     onChange={(e) => setMaxDepth(Number(e.target.value))}
-                    className="w-full"
-                    style={{ accentColor: PolicyEngineTheme.colors.TEAL_ACCENT }}
+                    style={{
+                      width: '100%',
+                      accentColor: colors.TEAL_ACCENT,
+                      cursor: 'pointer'
+                    }}
                   />
-                  <div className="flex justify-between text-xs mt-1" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: typography.fontSize.xs,
+                    marginTop: spacing.xs,
+                    color: colors.DARK_GRAY
+                  }}>
                     <span>1</span>
                     <span>20</span>
                   </div>
                 </div>
 
-                {/* Styled Checkboxes */}
-                <div className="space-y-2">
-                  <label className="flex items-center text-xs cursor-pointer p-2 rounded hover:bg-white transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={expandAddsSubtracts}
-                      onChange={(e) => setExpandAddsSubtracts(e.target.checked)}
-                      className="mr-2"
-                      style={{ accentColor: PolicyEngineTheme.colors.TEAL_ACCENT }}
-                    />
-                    <span style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                      Expand Adds/Subtracts
-                    </span>
-                  </label>
-
-                  <label className="flex items-center text-xs cursor-pointer p-2 rounded hover:bg-white transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={showLabels}
-                      onChange={(e) => setShowLabels(e.target.checked)}
-                      className="mr-2"
-                      style={{ accentColor: PolicyEngineTheme.colors.TEAL_ACCENT }}
-                    />
-                    <span style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                      Show Labels
-                    </span>
-                  </label>
-
-                  <label className="flex items-center text-xs cursor-pointer p-2 rounded hover:bg-white transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={showParameters}
-                      onChange={(e) => setShowParameters(e.target.checked)}
-                      className="mr-2"
-                      style={{ accentColor: PolicyEngineTheme.colors.TEAL_ACCENT }}
-                    />
-                    <span style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                      Show Parameters
-                    </span>
-                  </label>
+                {/* Checkboxes */}
+                <div style={{ marginBottom: spacing.md }}>
+                  {[
+                    { label: 'Expand Adds/Subtracts', checked: expandAddsSubtracts, onChange: setExpandAddsSubtracts },
+                    { label: 'Show Labels', checked: showLabels, onChange: setShowLabels },
+                    { label: 'Show Parameters', checked: showParameters, onChange: setShowParameters }
+                  ].map((item, idx) => (
+                    <label key={idx} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      fontSize: typography.fontSize.xs,
+                      cursor: 'pointer',
+                      padding: spacing.sm,
+                      borderRadius: borderRadius.sm,
+                      transition: transitions.fast,
+                      marginBottom: spacing.xs
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = colors.WHITE}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={item.checked}
+                        onChange={(e) => item.onChange(e.target.checked)}
+                        style={{
+                          marginRight: spacing.sm,
+                          accentColor: colors.TEAL_ACCENT,
+                          cursor: 'pointer'
+                        }}
+                      />
+                      <span style={{ color: colors.DARKEST_BLUE }}>{item.label}</span>
+                    </label>
+                  ))}
                 </div>
 
                 {/* Parameter Options */}
                 {showParameters && (
                   <>
-                    <div>
-                      <label className="block text-xs font-medium mb-1" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+                    <div style={{ marginBottom: spacing.md }}>
+                      <label style={{
+                        display: 'block',
+                        fontSize: typography.fontSize.xs,
+                        fontWeight: typography.fontWeight.medium,
+                        marginBottom: spacing.xs,
+                        color: colors.DARKEST_BLUE
+                      }}>
                         Parameter Detail Level
                       </label>
                       <select
                         value={paramDetailLevel}
                         onChange={(e) => setParamDetailLevel(e.target.value)}
-                        className="w-full px-3 py-2 text-xs rounded-md"
                         style={{
-                          border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-                          backgroundColor: PolicyEngineTheme.colors.WHITE
+                          width: '100%',
+                          padding: spacing.sm,
+                          fontSize: typography.fontSize.xs,
+                          borderRadius: borderRadius.md,
+                          border: `1px solid ${colors.BLUE_95}`,
+                          backgroundColor: colors.WHITE,
+                          cursor: 'pointer'
                         }}
                       >
                         <option value="Minimal">Minimal</option>
@@ -630,21 +728,31 @@ function App() {
                       </select>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-medium mb-1" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+                    <div style={{ marginBottom: spacing.md }}>
+                      <label style={{
+                        display: 'block',
+                        fontSize: typography.fontSize.xs,
+                        fontWeight: typography.fontWeight.medium,
+                        marginBottom: spacing.xs,
+                        color: colors.DARKEST_BLUE
+                      }}>
                         Don't Show Parameters For:
                       </label>
                       <textarea
-                        className="w-full px-3 py-2 text-xs rounded-md"
-                        style={{
-                          border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-                          backgroundColor: PolicyEngineTheme.colors.WHITE,
-                          resize: 'vertical'
-                        }}
-                        rows={2}
-                        placeholder="Enter variable names, one per line"
                         value={noParamsList}
                         onChange={(e) => setNoParamsList(e.target.value)}
+                        placeholder="Enter variable names, one per line"
+                        rows={2}
+                        style={{
+                          width: '100%',
+                          padding: spacing.sm,
+                          fontSize: typography.fontSize.xs,
+                          borderRadius: borderRadius.md,
+                          border: `1px solid ${colors.BLUE_95}`,
+                          backgroundColor: colors.WHITE,
+                          resize: 'vertical',
+                          fontFamily: typography.fontFamily.mono
+                        }}
                       />
                     </div>
                   </>
@@ -652,48 +760,69 @@ function App() {
 
                 {/* Stop Variables */}
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
-                    Stop Variables (optional):
+                  <label style={{
+                    display: 'block',
+                    fontSize: typography.fontSize.xs,
+                    fontWeight: typography.fontWeight.medium,
+                    marginBottom: spacing.xs,
+                    color: colors.DARKEST_BLUE
+                  }}>
+                    Stop Variables:
                   </label>
                   <textarea
-                    className="w-full px-3 py-2 text-xs rounded-md"
-                    style={{
-                      border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-                      backgroundColor: PolicyEngineTheme.colors.WHITE,
-                      resize: 'vertical'
-                    }}
-                    rows={3}
-                    placeholder="employment_income&#10;self_employment_income&#10;pension_income"
                     value={stopVariables}
                     onChange={(e) => setStopVariables(e.target.value)}
+                    placeholder="employment_income&#10;self_employment_income&#10;pension_income"
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: spacing.sm,
+                      fontSize: typography.fontSize.xs,
+                      borderRadius: borderRadius.md,
+                      border: `1px solid ${colors.BLUE_95}`,
+                      backgroundColor: colors.WHITE,
+                      resize: 'vertical',
+                      fontFamily: typography.fontFamily.mono
+                    }}
                   />
                 </div>
               </div>
             )}
           </div>
 
-          {/* Enhanced Generate Button */}
+          {/* Generate Button */}
           <button
             onClick={generateFlowchart}
             disabled={loading || !selectedVariable}
-            className="w-full py-3 px-4 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2"
-            style={{ 
-              backgroundColor: loading || !selectedVariable ? PolicyEngineTheme.colors.MEDIUM_LIGHT_GRAY : PolicyEngineTheme.colors.BLUE_PRIMARY,
-              color: PolicyEngineTheme.colors.WHITE,
-              boxShadow: loading || !selectedVariable ? 'none' : '0 4px 12px rgba(44, 100, 150, 0.4)',
-              transform: 'translateY(0)',
-              cursor: loading || !selectedVariable ? 'not-allowed' : 'pointer'
+            style={{
+              width: '100%',
+              height: '48px',
+              padding: spacing.md,
+              borderRadius: borderRadius.md,
+              fontSize: typography.fontSize.base,
+              fontWeight: typography.fontWeight.semibold,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: spacing.sm,
+              backgroundColor: loading || !selectedVariable ? colors.MEDIUM_LIGHT_GRAY : colors.BLUE_PRIMARY,
+              color: colors.WHITE,
+              border: 'none',
+              boxShadow: loading || !selectedVariable ? 'none' : shadows.md,
+              cursor: loading || !selectedVariable ? 'not-allowed' : 'pointer',
+              transition: transitions.normal,
+              marginBottom: spacing.md
             }}
             onMouseEnter={(e) => {
               if (!loading && selectedVariable) {
                 e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(44, 100, 150, 0.5)';
+                e.currentTarget.style.boxShadow = shadows.lg;
               }
             }}
             onMouseLeave={(e) => {
               if (!loading && selectedVariable) {
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(44, 100, 150, 0.4)';
+                e.currentTarget.style.boxShadow = shadows.md;
               }
             }}
           >
@@ -709,10 +838,17 @@ function App() {
 
           {/* Error Display */}
           {error && (
-            <div className="mt-4 p-3 rounded-lg text-xs flex items-start gap-2" style={{
+            <div style={{
+              marginBottom: spacing.md,
+              padding: spacing.md,
+              borderRadius: borderRadius.md,
+              fontSize: typography.fontSize.xs,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: spacing.sm,
               backgroundColor: '#FEF2F2',
-              border: `1px solid ${PolicyEngineTheme.colors.DARK_RED}`,
-              color: PolicyEngineTheme.colors.DARK_RED
+              border: `1px solid ${colors.DARK_RED}`,
+              color: colors.DARK_RED
             }}>
               <span>⚠️</span>
               <div>
@@ -721,144 +857,178 @@ function App() {
             </div>
           )}
 
-
-          {/* Graph Stats with better design */}
+          {/* Graph Stats */}
           {graphData && (
-            <div className="mt-4 p-3 rounded-lg" style={{
-              backgroundColor: PolicyEngineTheme.colors.TEAL_LIGHT,
-              border: `1px solid ${PolicyEngineTheme.colors.TEAL_ACCENT}`
+            <div style={{
+              marginBottom: spacing.md,
+              padding: spacing.md,
+              borderRadius: borderRadius.md,
+              backgroundColor: colors.TEAL_LIGHT,
+              border: `1px solid ${colors.TEAL_ACCENT}`
             }}>
-              <div className="text-xs font-semibold mb-3" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+              <div style={{
+                fontSize: typography.fontSize.xs,
+                fontWeight: typography.fontWeight.semibold,
+                marginBottom: spacing.md,
+                color: colors.DARKEST_BLUE
+              }}>
                 Graph Statistics
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="p-3 rounded text-center" style={{
-                  backgroundColor: PolicyEngineTheme.colors.WHITE,
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing.sm }}>
+                <div style={{
+                  padding: spacing.md,
+                  borderRadius: borderRadius.sm,
+                  textAlign: 'center',
+                  backgroundColor: colors.WHITE,
+                  boxShadow: shadows.sm
                 }}>
-                  <div style={{ color: PolicyEngineTheme.colors.BLUE_PRIMARY, fontSize: '20px', fontWeight: 'bold' }}>
+                  <div style={{
+                    color: colors.BLUE_PRIMARY,
+                    fontSize: typography.fontSize.xl,
+                    fontWeight: typography.fontWeight.bold
+                  }}>
                     {graphData.nodes.length}
                   </div>
-                  <div style={{ color: PolicyEngineTheme.colors.DARK_GRAY, fontSize: '11px' }}>Nodes</div>
+                  <div style={{
+                    color: colors.DARK_GRAY,
+                    fontSize: typography.fontSize.xs
+                  }}>
+                    Nodes
+                  </div>
                 </div>
-                <div className="p-3 rounded text-center" style={{
-                  backgroundColor: PolicyEngineTheme.colors.WHITE,
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                <div style={{
+                  padding: spacing.md,
+                  borderRadius: borderRadius.sm,
+                  textAlign: 'center',
+                  backgroundColor: colors.WHITE,
+                  boxShadow: shadows.sm
                 }}>
-                  <div style={{ color: PolicyEngineTheme.colors.TEAL_ACCENT, fontSize: '20px', fontWeight: 'bold' }}>
+                  <div style={{
+                    color: colors.TEAL_ACCENT,
+                    fontSize: typography.fontSize.xl,
+                    fontWeight: typography.fontWeight.bold
+                  }}>
                     {graphData.edges.length}
                   </div>
-                  <div style={{ color: PolicyEngineTheme.colors.DARK_GRAY, fontSize: '11px' }}>Edges</div>
+                  <div style={{
+                    color: colors.DARK_GRAY,
+                    fontSize: typography.fontSize.xs
+                  }}>
+                    Edges
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Legend Section */}
+          {/* Legend */}
           {graphData && (
-            <div className="mt-4 p-4 rounded-lg" style={{
-              backgroundColor: PolicyEngineTheme.colors.WHITE,
-              border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+            <div style={{
+              padding: spacing.md,
+              borderRadius: borderRadius.md,
+              backgroundColor: colors.WHITE,
+              border: `1px solid ${colors.BLUE_95}`,
+              boxShadow: shadows.sm
             }}>
-              <h3 
-                className="text-sm font-semibold cursor-pointer flex items-center gap-1"
+              <h3
                 onClick={() => setLegendExpanded(!legendExpanded)}
-                style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE, userSelect: 'none', margin: 0 }}
+                style={{
+                  fontSize: typography.fontSize.sm,
+                  fontWeight: typography.fontWeight.semibold,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: spacing.xs,
+                  color: colors.DARKEST_BLUE,
+                  userSelect: 'none',
+                  margin: 0
+                }}
               >
                 Legend
-                <svg
-                  className={`inline-block transition-transform duration-200 ${legendExpanded ? 'rotate-180' : ''}`}
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke={PolicyEngineTheme.colors.DARK_GRAY}
-                  strokeWidth="2"
-                  style={{ marginLeft: '2px' }}
-                >
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
+                <ChevronIcon open={legendExpanded} />
               </h3>
-              
+
               {legendExpanded && (
-                <div className="mt-3 space-y-0">
-                  {/* Node Types */}
-                  <div>
-                    <p className="text-xs font-semibold mb-2" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+                <div style={{ marginTop: spacing.md }}>
+                  {/* Nodes */}
+                  <div style={{ marginBottom: spacing.md }}>
+                    <p style={{
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.sm,
+                      color: colors.DARKEST_BLUE
+                    }}>
                       Nodes
                     </p>
-                    <div className="space-y-2" style={{ paddingLeft: '12px' }}>
-                      <div className="flex items-center gap-3">
-                        <div style={{ 
-                          width: '14px',
-                          height: '14px',
-                          borderRadius: '50%',
-                          backgroundColor: PolicyEngineTheme.colors.TEAL_ACCENT,
-                          flexShrink: 0
-                        }}></div>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Root</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div style={{ 
-                          width: '14px',
-                          height: '14px',
-                          borderRadius: '50%',
-                          backgroundColor: PolicyEngineTheme.colors.BLUE_PRIMARY,
-                          flexShrink: 0
-                        }}></div>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Dependency</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div style={{ 
-                          width: '14px',
-                          height: '14px',
-                          borderRadius: '50%',
-                          backgroundColor: PolicyEngineTheme.colors.DARK_RED,
-                          flexShrink: 0
-                        }}></div>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Stop</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div style={{ 
-                          width: '14px',
-                          height: '14px',
-                          borderRadius: '50%',
-                          backgroundColor: '#8B4B9B',
-                          flexShrink: 0
-                        }}></div>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Defined For</span>
-                      </div>
+                    <div style={{ paddingLeft: spacing.md }}>
+                      {[
+                        { color: colors.TEAL_ACCENT, label: 'Root' },
+                        { color: colors.BLUE_PRIMARY, label: 'Dependency' },
+                        { color: colors.DARK_RED, label: 'Stop' },
+                        { color: '#8B4B9B', label: 'Defined For' }
+                      ].map((item, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: spacing.md,
+                          marginBottom: spacing.sm
+                        }}>
+                          <div style={{
+                            width: '14px',
+                            height: '14px',
+                            borderRadius: borderRadius.full,
+                            backgroundColor: item.color,
+                            flexShrink: 0
+                          }}></div>
+                          <span style={{
+                            fontSize: typography.fontSize.xs,
+                            color: colors.DARK_GRAY
+                          }}>
+                            {item.label}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Divider */}
-                  <div style={{ 
-                    borderTop: `1px dashed ${PolicyEngineTheme.colors.BLUE_95}`,
-                    marginTop: '6px',
-                    marginBottom: '6px'
-                  }}></div>
-
-                  {/* Edge Types */}
+                  {/* Edges */}
                   <div>
-                    <p className="text-xs font-semibold mb-2" style={{ color: PolicyEngineTheme.colors.DARKEST_BLUE }}>
+                    <p style={{
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.semibold,
+                      marginBottom: spacing.sm,
+                      color: colors.DARKEST_BLUE
+                    }}>
                       Edges
                     </p>
-                    <div className="space-y-2" style={{ paddingLeft: '12px' }}>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold" style={{ color: PolicyEngineTheme.colors.GREEN, minWidth: '65px' }}>+ (green)</span>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Addition</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold" style={{ color: PolicyEngineTheme.colors.DARK_RED, minWidth: '65px' }}>- (red)</span>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Subtraction</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div style={{ minWidth: '65px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div className="w-8 h-0.5" style={{ backgroundColor: PolicyEngineTheme.colors.GRAY }}></div>
+                    <div style={{ paddingLeft: spacing.md }}>
+                      {[
+                        { color: colors.GREEN, label: 'Addition', symbol: '+' },
+                        { color: colors.DARK_RED, label: 'Subtraction', symbol: '-' },
+                        { color: colors.GRAY, label: 'Reference', symbol: '→' }
+                      ].map((item, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: spacing.sm,
+                          marginBottom: spacing.sm
+                        }}>
+                          <span style={{
+                            fontSize: typography.fontSize.sm,
+                            fontWeight: typography.fontWeight.bold,
+                            color: item.color,
+                            minWidth: '24px'
+                          }}>
+                            {item.symbol}
+                          </span>
+                          <span style={{
+                            fontSize: typography.fontSize.xs,
+                            color: colors.DARK_GRAY
+                          }}>
+                            {item.label}
+                          </span>
                         </div>
-                        <span className="text-xs" style={{ color: PolicyEngineTheme.colors.DARK_GRAY }}>Reference</span>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -866,31 +1036,31 @@ function App() {
             </div>
           )}
         </div>
-      </div>
+      </aside>
 
-      {/* Graph Container with better styling */}
-      <div style={{ 
+      {/* Main Graph Area */}
+      <main style={{
         flex: 1,
-        padding: '24px',
+        padding: spacing.lg,
         minWidth: 0,
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
-        overflow: 'hidden',
-        position: 'relative'
+        overflow: 'hidden'
       }}>
-        <div ref={networkContainer} style={{
-          width: '100%',
-          height: '100%',
-          backgroundColor: PolicyEngineTheme.colors.WHITE,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
-          border: `1px solid ${PolicyEngineTheme.colors.BLUE_95}`,
-          borderRadius: '12px',
-          flex: 1
-        }}></div>
-        
-      </div>
-
+        <div
+          ref={networkContainer}
+          style={{
+            width: '100%',
+            height: '100%',
+            backgroundColor: colors.WHITE,
+            boxShadow: shadows.lg,
+            border: `1px solid ${colors.BLUE_95}`,
+            borderRadius: borderRadius.lg,
+            flex: 1
+          }}
+        ></div>
+      </main>
     </div>
   );
 }

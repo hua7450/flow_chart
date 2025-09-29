@@ -1,36 +1,29 @@
-/* Custom styles for the app */
-.App {
-  text-align: center;
+/* ===================================
+   Global Resets and Base Styles
+   =================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-/* Vis.js network container needs explicit height */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===================================
+   Vis.js Network Styles
+   =================================== */
+
 .vis-network {
   width: 100% !important;
   height: 100% !important;
   position: relative;
 }
 
-/* Custom scrollbar for sidebar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
-
-/* Tooltip styles */
 .vis-tooltip {
   position: absolute !important;
   visibility: hidden;
@@ -41,48 +34,101 @@
   font-size: 13px !important;
   line-height: 1.5 !important;
   background-color: rgba(255, 255, 255, 0.98) !important;
-  color: #333 !important;
-  border: 1px solid #ddd !important;
-  border-radius: 6px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  color: #0C1A27 !important;
+  border: 1px solid #D8E6F3 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1) !important;
   max-width: 400px !important;
   min-width: 250px !important;
   z-index: 9999 !important;
   overflow: visible !important;
 }
 
-/* Loading spinner */
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+/* ===================================
+   Custom Scrollbar
+   =================================== */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-.animate-spin {
-  animation: spin 1s linear infinite;
+::-webkit-scrollbar-track {
+  background: #F7FAFD;
+  border-radius: 4px;
 }
 
-/* Checkbox custom styles */
+::-webkit-scrollbar-thumb {
+  background: #D8E6F3;
+  border-radius: 4px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2C6496;
+}
+
+/* ===================================
+   Form Elements
+   =================================== */
+
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+input:focus,
+textarea:focus,
+select:focus,
+button:focus {
+  outline: none;
+}
+
 input[type="checkbox"] {
   cursor: pointer;
+  width: 16px;
+  height: 16px;
 }
 
 input[type="range"] {
   cursor: pointer;
+  height: 6px;
 }
 
-/* Details/Summary styling */
-details summary {
-  user-select: none;
+/* Custom range slider */
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #39C6C0;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.15s ease;
 }
 
-details[open] summary {
-  margin-bottom: 0.5rem;
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(57, 198, 192, 0.3);
 }
 
-/* Button hover effects */
-button {
-  transition: all 0.2s ease-in-out;
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #39C6C0;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.15s ease;
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(57, 198, 192, 0.3);
 }
 
 /* Select dropdown custom arrow */
@@ -90,16 +136,61 @@ select {
   appearance: none;
   background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
   background-repeat: no-repeat;
-  background-position: right 0.5rem center;
-  background-size: 1.5em 1.5em;
+  background-position: right 0.75rem center;
+  background-size: 1.25em 1.25em;
   padding-right: 2.5rem;
 }
 
-/* Custom animations */
-@keyframes slideIn {
+/* Button reset */
+button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ===================================
+   Animations
+   =================================== */
+
+/* Spinner animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+/* Slide in from top */
+@keyframes slideInTop {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
   }
   to {
     opacity: 1;
@@ -107,13 +198,105 @@ select {
   }
 }
 
-@keyframes slideDown {
+.slide-in-top {
+  animation: slideInTop 0.3s ease-out;
+}
+
+/* Slide in from bottom */
+@keyframes slideInBottom {
   from {
     opacity: 0;
-    max-height: 0;
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
-    max-height: 1000px;
+    transform: translateY(0);
+  }
+}
+
+.slide-in-bottom {
+  animation: slideInBottom 0.3s ease-out;
+}
+
+/* Scale in */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+/* Pulse animation for loading states */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ===================================
+   Utility Classes
+   =================================== */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===================================
+   Responsive Utilities
+   =================================== */
+
+@media (max-width: 768px) {
+  aside {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 50vh;
+  }
+
+  main {
+    flex: 1 !important;
+  }
+}
+
+/* ===================================
+   Print Styles
+   =================================== */
+
+@media print {
+  aside {
+    display: none;
+  }
+
+  main {
+    width: 100% !important;
+    padding: 0 !important;
   }
 }
