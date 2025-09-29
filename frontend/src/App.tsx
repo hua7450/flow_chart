@@ -107,6 +107,7 @@ function App() {
   const [legendExpanded, setLegendExpanded] = useState<boolean>(true);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
+  const [highlightedPath, setHighlightedPath] = useState<Set<string>>(new Set());
 
   // Controls
   const [maxDepth, setMaxDepth] = useState<number>(10);
@@ -119,12 +120,16 @@ function App() {
   const [noParamsList, setNoParamsList] = useState<string[]>([]);
   const [noParamsSearch, setNoParamsSearch] = useState<string>('');
   const [showNoParamsDropdown, setShowNoParamsDropdown] = useState<boolean>(false);
+  const [layoutDirection, setLayoutDirection] = useState<string>('UD'); // UD, DU, LR, RL
+  const [nodeSpacing, setNodeSpacing] = useState<number>(300);
+  const [levelSeparation, setLevelSeparation] = useState<number>(150);
 
   const networkContainer = useRef<HTMLDivElement>(null);
   const networkInstance = useRef<Network | null>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const stopVarContainerRef = useRef<HTMLDivElement>(null);
   const noParamsContainerRef = useRef<HTMLDivElement>(null);
+  const skipAutoReposition = useRef<boolean>(false);
 
   // Load variables on mount and when country changes
   useEffect(() => {
@@ -269,6 +274,136 @@ function App() {
     }
   };
 
+  // Function to find all dependencies flowing into a node (downward dependencies)
+  const findPathToNode = (targetNodeId: string, edges: GraphEdge[]): Set<string> => {
+    const pathNodes = new Set<string>();
+
+    // Build adjacency map (parent -> children) for traversing dependencies
+    const childToParents = new Map<string, string[]>();
+
+    edges.forEach(edge => {
+      if (!childToParents.has(edge.to)) {
+        childToParents.set(edge.to, []);
+      }
+      childToParents.get(edge.to)!.push(edge.from);
+    });
+
+    // BFS from target node going backwards through all dependencies
+    const visited = new Set<string>();
+    const queue: string[] = [targetNodeId];
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      pathNodes.add(current);
+
+      // Get all parents (dependencies) of current node
+      const parents = childToParents.get(current) || [];
+      for (const parent of parents) {
+        if (!visited.has(parent)) {
+          queue.push(parent);
+        }
+      }
+    }
+
+    return pathNodes;
+  };
+
+  const highlightPath = (nodeId: string) => {
+    if (!graphData || !networkInstance.current) return;
+
+    const path = findPathToNode(nodeId, graphData.edges);
+    setHighlightedPath(path);
+
+    // Access internal body property (not in TypeScript types but exists at runtime)
+    const network = networkInstance.current as any;
+
+    // Store highlighting info in the graph data for re-rendering
+    graphData.nodes.forEach(node => {
+      const isInPath = path.has(node.id);
+      const nodeElement = network.body?.nodes[node.id];
+      if (nodeElement && nodeElement.setOptions) {
+        if (!isInPath) {
+          nodeElement.setOptions({
+            opacity: 0.2,
+            color: {
+              background: '#e0e0e0',
+              border: '#999'
+            },
+            font: { color: '#999' }
+          });
+        }
+      }
+    });
+
+    graphData.edges.forEach((edge, idx) => {
+      const isInPath = path.has(edge.from) && path.has(edge.to);
+      const edges = network.body?.edges || {};
+      const edgeId = Object.keys(edges).find(key => {
+        const e = edges[key];
+        return (e.from?.id === edge.from || e.fromId === edge.from) &&
+               (e.to?.id === edge.to || e.toId === edge.to);
+      });
+      const edgeElement = edgeId ? edges[edgeId] : null;
+
+      if (edgeElement && edgeElement.setOptions) {
+        if (isInPath) {
+          edgeElement.setOptions({
+            color: { color: '#2C6496' },
+            width: 4
+          });
+        } else {
+          edgeElement.setOptions({
+            color: { color: '#e0e0e0' },
+            width: 1
+          });
+        }
+      }
+    });
+
+    network.redraw();
+  };
+
+  const clearHighlight = () => {
+    if (!graphData || !networkInstance.current) return;
+
+    setHighlightedPath(new Set());
+
+    const network = networkInstance.current as any;
+
+    // Restore original styles
+    graphData.nodes.forEach(node => {
+      const nodeElement = network.body?.nodes[node.id];
+      if (nodeElement && nodeElement.setOptions) {
+        nodeElement.setOptions({
+          opacity: 1,
+          color: node.color,
+          font: node.font
+        });
+      }
+    });
+
+    graphData.edges.forEach((edge, idx) => {
+      const edges = network.body?.edges || {};
+      const edgeId = Object.keys(edges).find(key => {
+        const e = edges[key];
+        return (e.from?.id === edge.from || e.fromId === edge.from) &&
+               (e.to?.id === edge.to || e.toId === edge.to);
+      });
+      const edgeElement = edgeId ? edges[edgeId] : null;
+
+      if (edgeElement && edgeElement.setOptions) {
+        edgeElement.setOptions({
+          color: edge.color,
+          width: 2
+        });
+      }
+    });
+
+    network.redraw();
+  };
+
   const renderGraph = (data: GraphData) => {
     if (!networkContainer.current) return;
 
@@ -280,14 +415,15 @@ function App() {
       layout: {
         hierarchical: {
           enabled: true,
-          direction: 'UD',
+          direction: layoutDirection,
           sortMethod: 'directed',
-          nodeSpacing: 300,
-          levelSeparation: 150,
+          nodeSpacing: nodeSpacing,
+          levelSeparation: levelSeparation,
           treeSpacing: 200,
-          blockShifting: false,
+          blockShifting: true,
           edgeMinimization: true,
-          parentCentralization: true
+          parentCentralization: true,
+          shakeTowards: 'leaves'
         }
       },
       autoResize: true,
@@ -325,13 +461,18 @@ function App() {
       edges: {
         smooth: {
           enabled: true,
-          type: 'cubicBezier',
-          roundness: 0.5
+          type: layoutDirection === 'LR' || layoutDirection === 'RL' ? 'cubicBezier' : 'vertical',
+          roundness: 0.5,
+          forceDirection: layoutDirection === 'UD' || layoutDirection === 'DU' ? 'vertical' : 'horizontal'
         },
         width: 2,
         arrows: {
           to: { enabled: true, scaleFactor: 1.2 }
-        }
+        },
+        color: {
+          inherit: false
+        },
+        chosen: true
       },
       interaction: {
         hover: true,
@@ -353,7 +494,7 @@ function App() {
       options
     );
 
-    setTimeout(() => {
+    const repositionNodes = () => {
       if (!networkInstance.current) return;
 
       const positions = networkInstance.current.getPositions();
@@ -386,7 +527,10 @@ function App() {
       });
 
       networkInstance.current.fit();
-    }, 100);
+    };
+
+    // Call repositioning after a delay to let initial layout settle
+    setTimeout(repositionNodes, 500);
 
     networkInstance.current.on("hoverNode", function () {
       document.body.style.cursor = 'pointer';
@@ -429,6 +573,7 @@ function App() {
       if (params.nodes.length > 0) {
         const nodeId = params.nodes[0];
         const event = params.event.srcEvent || params.event;
+
         // Calculate position with offset to avoid covering the node
         const menuWidth = 200;
         const menuHeight = 150;
@@ -450,19 +595,22 @@ function App() {
         });
       } else {
         setContextMenu(null);
+        // Clear highlight when clicking on background
+        if (highlightedPath.size > 0) {
+          clearHighlight();
+        }
       }
     });
 
     networkInstance.current.on("stabilizationIterationsDone", function () {
+      // Skip auto-repositioning if we're doing a manual re-layout
+      if (skipAutoReposition.current) {
+        skipAutoReposition.current = false;
+        return;
+      }
+      // Reposition nodes after stabilization completes
       setTimeout(() => {
-        if (networkInstance.current) {
-          networkInstance.current.fit({
-            animation: {
-              duration: 1000,
-              easingFunction: 'easeInOutQuad'
-            }
-          });
-        }
+        repositionNodes();
       }, 100);
     });
 
@@ -796,6 +944,91 @@ function App() {
                     <span>1</span>
                     <span>20</span>
                   </div>
+                </div>
+
+                {/* Layout Direction */}
+                <div style={{ marginBottom: spacing.md }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: typography.fontSize.xs,
+                    fontWeight: typography.fontWeight.medium,
+                    marginBottom: spacing.xs,
+                    color: colors.DARKEST_BLUE
+                  }}>
+                    Layout Direction:
+                  </label>
+                  <select
+                    value={layoutDirection}
+                    onChange={(e) => setLayoutDirection(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: spacing.sm,
+                      fontSize: typography.fontSize.sm,
+                      border: `1px solid ${colors.BLUE_95}`,
+                      borderRadius: borderRadius.md,
+                      backgroundColor: colors.WHITE,
+                      color: colors.DARKEST_BLUE,
+                      cursor: 'pointer',
+                      transition: transitions.normal
+                    }}
+                  >
+                    <option value="UD">Top to Bottom (⬇)</option>
+                    <option value="DU">Bottom to Top (⬆)</option>
+                    <option value="LR">Left to Right (➡)</option>
+                    <option value="RL">Right to Left (⬅)</option>
+                  </select>
+                </div>
+
+                {/* Node Spacing */}
+                <div style={{ marginBottom: spacing.md }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: typography.fontSize.xs,
+                    fontWeight: typography.fontWeight.medium,
+                    marginBottom: spacing.sm,
+                    color: colors.DARKEST_BLUE
+                  }}>
+                    Node Spacing: <span style={{ fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>{nodeSpacing}px</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="100"
+                    max="500"
+                    step="50"
+                    value={nodeSpacing}
+                    onChange={(e) => setNodeSpacing(Number(e.target.value))}
+                    style={{
+                      width: '100%',
+                      accentColor: colors.TEAL_ACCENT,
+                      cursor: 'pointer'
+                    }}
+                  />
+                </div>
+
+                {/* Level Separation */}
+                <div style={{ marginBottom: spacing.md }}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: typography.fontSize.xs,
+                    fontWeight: typography.fontWeight.medium,
+                    marginBottom: spacing.sm,
+                    color: colors.DARKEST_BLUE
+                  }}>
+                    Level Separation: <span style={{ fontWeight: typography.fontWeight.bold, fontSize: typography.fontSize.sm }}>{levelSeparation}px</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="50"
+                    max="300"
+                    step="25"
+                    value={levelSeparation}
+                    onChange={(e) => setLevelSeparation(Number(e.target.value))}
+                    style={{
+                      width: '100%',
+                      accentColor: colors.TEAL_ACCENT,
+                      cursor: 'pointer'
+                    }}
+                  />
                 </div>
 
                 {/* Checkboxes */}
@@ -1451,7 +1684,7 @@ function App() {
       {/* Main Graph Area */}
       <main style={{
         flex: 1,
-        padding: isFullscreen ? 0 : spacing.lg,
+        padding: spacing.lg,
         minWidth: 0,
         display: 'flex',
         flexDirection: 'column',
@@ -1471,8 +1704,8 @@ function App() {
             onClick={() => setIsFullscreen(!isFullscreen)}
             style={{
               position: 'absolute',
-              top: isFullscreen ? spacing.md : spacing.lg,
-              right: isFullscreen ? spacing.md : spacing.lg,
+              top: spacing.xl,
+              right: spacing.xl,
               zIndex: 10,
               padding: spacing.sm,
               backgroundColor: colors.WHITE,
@@ -1497,6 +1730,244 @@ function App() {
             title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
           >
             <FullscreenIcon isFullscreen={isFullscreen} />
+          </button>
+        )}
+
+        {/* Adjust Layout Button */}
+        {graphData && (
+          <button
+            onClick={() => {
+              if (networkInstance.current && networkContainer.current) {
+                // Save current spacing
+                const originalNodeSpacing = nodeSpacing;
+                const originalLevelSeparation = levelSeparation;
+
+                // Temporarily increase spacing
+                setNodeSpacing(nodeSpacing * 1.3);
+                setLevelSeparation(levelSeparation * 1.3);
+
+                // Set flag and destroy current network
+                skipAutoReposition.current = true;
+                networkInstance.current.destroy();
+
+                // Recreate with wider spacing
+                const options = {
+                  layout: {
+                    hierarchical: {
+                      enabled: true,
+                      direction: layoutDirection,
+                      sortMethod: 'directed',
+                      nodeSpacing: nodeSpacing * 1.3,
+                      levelSeparation: levelSeparation * 1.3,
+                      treeSpacing: 250,
+                      blockShifting: true,
+                      edgeMinimization: true,
+                      parentCentralization: true,
+                      shakeTowards: 'leaves'
+                    }
+                  },
+                  autoResize: true,
+                  physics: { enabled: false },
+                  nodes: {
+                    borderWidth: 2,
+                    borderWidthSelected: 4,
+                    margin: { top: 10, right: 15, bottom: 10, left: 15 },
+                    widthConstraint: { maximum: 250 },
+                    heightConstraint: { minimum: 40 },
+                    font: {
+                      size: 14,
+                      face: typography.fontFamily.sans,
+                      bold: { face: typography.fontFamily.sans }
+                    },
+                    shape: 'box',
+                    shadow: {
+                      enabled: true,
+                      color: 'rgba(0,0,0,0.1)',
+                      size: 10,
+                      x: 2,
+                      y: 2
+                    },
+                    chosen: {
+                      node: function(values: any, id: any, selected: any, hovering: any) {
+                        if (hovering) {
+                          values.borderWidth = 3;
+                          values.shadow = true;
+                          values.shadowSize = 14;
+                        }
+                      },
+                      label: false
+                    }
+                  },
+                  edges: {
+                    smooth: {
+                      enabled: true,
+                      type: layoutDirection === 'LR' || layoutDirection === 'RL' ? 'cubicBezier' : 'vertical',
+                      roundness: 0.5,
+                      forceDirection: layoutDirection === 'UD' || layoutDirection === 'DU' ? 'vertical' : 'horizontal'
+                    },
+                    width: 2,
+                    arrows: {
+                      to: { enabled: true, scaleFactor: 1.2 }
+                    },
+                    color: {
+                      inherit: false
+                    },
+                    chosen: true
+                  },
+                  interaction: {
+                    hover: true,
+                    tooltipDelay: 300,
+                    zoomView: true,
+                    dragView: true,
+                    navigationButtons: false,
+                    keyboard: { enabled: false },
+                    zoomSpeed: 0.5,
+                    hideEdgesOnDrag: false,
+                    hideEdgesOnZoom: false,
+                    hideNodesOnDrag: false
+                  }
+                };
+
+                networkInstance.current = new Network(
+                  networkContainer.current,
+                  { nodes: graphData.nodes, edges: graphData.edges },
+                  options
+                );
+
+                // Re-attach event listeners
+                networkInstance.current.on("hoverNode", function () {
+                  document.body.style.cursor = 'pointer';
+                });
+
+                networkInstance.current.on("blurNode", function () {
+                  document.body.style.cursor = 'default';
+                });
+
+                // Add context menu on right-click
+                networkInstance.current.on("oncontext", function (params) {
+                  params.event.preventDefault();
+                  if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    const event = params.event.srcEvent || params.event;
+                    const menuWidth = 200;
+                    const menuHeight = 150;
+                    let x = event.clientX + 10;
+                    let y = event.clientY + 10;
+
+                    if (x + menuWidth > window.innerWidth) {
+                      x = event.clientX - menuWidth - 10;
+                    }
+                    if (y + menuHeight > window.innerHeight) {
+                      y = event.clientY - menuHeight - 10;
+                    }
+
+                    setContextMenu({ x, y, nodeId });
+                  }
+                });
+
+                // Add context menu on regular click
+                networkInstance.current.on("click", function (params) {
+                  if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    const event = params.event.srcEvent || params.event;
+                    const menuWidth = 200;
+                    const menuHeight = 150;
+                    let x = event.clientX + 10;
+                    let y = event.clientY + 10;
+
+                    if (x + menuWidth > window.innerWidth) {
+                      x = event.clientX - menuWidth - 10;
+                    }
+                    if (y + menuHeight > window.innerHeight) {
+                      y = event.clientY - menuHeight - 10;
+                    }
+
+                    setContextMenu({ x, y, nodeId });
+                  } else {
+                    setContextMenu(null);
+                    if (highlightedPath.size > 0) {
+                      clearHighlight();
+                    }
+                  }
+                });
+
+                setTimeout(() => {
+                  if (networkInstance.current) {
+                    networkInstance.current.fit();
+                  }
+                  // Restore original spacing values
+                  setNodeSpacing(originalNodeSpacing);
+                  setLevelSeparation(originalLevelSeparation);
+                }, 600);
+              }
+            }}
+            style={{
+              position: 'absolute',
+              bottom: spacing.xl,
+              right: spacing.xl,
+              zIndex: 10,
+              padding: `${spacing.sm} ${spacing.md}`,
+              backgroundColor: colors.BLUE_PRIMARY,
+              border: `1px solid ${colors.BLUE_PRESSED}`,
+              borderRadius: borderRadius.md,
+              cursor: 'pointer',
+              boxShadow: shadows.md,
+              display: 'flex',
+              alignItems: 'center',
+              gap: spacing.xs,
+              transition: transitions.normal,
+              color: colors.WHITE,
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.medium
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = colors.BLUE_PRESSED;
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = colors.BLUE_PRIMARY;
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            title="Adjust graph layout for better clarity"
+          >
+            <span>Adjust Layout</span>
+          </button>
+        )}
+
+        {/* Clear Highlight Button - Shows when highlighting is active */}
+        {graphData && highlightedPath.size > 0 && (
+          <button
+            onClick={() => clearHighlight()}
+            style={{
+              position: 'absolute',
+              top: spacing.xl,
+              right: `calc(${spacing.xl} + 50px)`,
+              zIndex: 10,
+              padding: `${spacing.sm} ${spacing.md}`,
+              backgroundColor: colors.BLUE_PRIMARY,
+              border: `1px solid ${colors.BLUE_PRESSED}`,
+              borderRadius: borderRadius.md,
+              cursor: 'pointer',
+              boxShadow: shadows.md,
+              display: 'flex',
+              alignItems: 'center',
+              gap: spacing.xs,
+              transition: transitions.normal,
+              color: colors.WHITE,
+              fontSize: typography.fontSize.sm,
+              fontWeight: typography.fontWeight.medium
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = colors.BLUE_PRESSED;
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = colors.BLUE_PRIMARY;
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            title="Clear path highlight"
+          >
+            <span>Clear Highlight</span>
           </button>
         )}
 
@@ -1647,6 +2118,36 @@ function App() {
           >
             <span>📄</span>
             <span>View Source Code</span>
+          </button>
+          <button
+            onClick={() => {
+              highlightPath(contextMenu.nodeId);
+              setContextMenu(null);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: spacing.sm,
+              width: '100%',
+              padding: `${spacing.sm} ${spacing.md}`,
+              fontSize: typography.fontSize.sm,
+              color: colors.DARKEST_BLUE,
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderTop: `1px solid ${colors.BLUE_95}`,
+              cursor: 'pointer',
+              transition: transitions.fast,
+              textAlign: 'left'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = colors.BLUE_98;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <span>✨</span>
+            <span>Highlight Path</span>
           </button>
           <div
             style={{
