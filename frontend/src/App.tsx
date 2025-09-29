@@ -153,6 +153,15 @@ function App() {
     };
   }, []);
 
+  // Keep tooltip hidden while context menu is open
+  useEffect(() => {
+    if (contextMenu) {
+      document.body.classList.add('context-menu-open');
+    } else {
+      document.body.classList.remove('context-menu-open');
+    }
+  }, [contextMenu]);
+
   const loadVariables = async () => {
     try {
       const response = await axios.get(`${API_BASE}/variables`, {
@@ -294,7 +303,7 @@ function App() {
       },
       interaction: {
         hover: true,
-        tooltipDelay: 100,
+        tooltipDelay: 300,
         zoomView: true,
         dragView: true,
         navigationButtons: false,

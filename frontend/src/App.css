@@ -44,6 +44,13 @@ body {
   overflow: visible !important;
 }
 
+/* Force hide tooltip when context menu is open */
+body.context-menu-open .vis-tooltip {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
 /* ===================================
    Custom Scrollbar
    =================================== */
